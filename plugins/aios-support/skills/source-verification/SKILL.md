@@ -9,11 +9,13 @@ description: 对 AIOS 五个本地 bare mirror 进行只读、commit 绑定的�
 
 ## 仓库路由
 
-- `aios`：应用、推理引擎、Model Center 辅助服务和部署资产。
-- `zstack`：核心 API、资源编排和后端业务逻辑。
-- `premium`：商业 AI 功能和高级后端能力。
-- `zstack-utility`：主机 Agent、脚本和系统侧执行逻辑。
-- `zstack-ui-next`：页面、菜单、权限条件和前端交互。
+- `aios`：整个仓库都属于 AIOS 查询范围。
+- `zstack`：只查询由 AIOS API、消息、资源类型或已命中调用方定位到的代码。
+- `premium`：只查询 AI 模块、GuestTools 及其直接调用方。
+- `zstack-utility`：只查询 GPU、GuestTools、Host Agent 中与 AIOS 直接相关的代码。
+- `zstack-ui-next`：只查询 AI Store、模型、推理服务、GPU 等 AIOS 页面和请求代码。
+
+禁止无条件扫描后四个仓库。先按问题定位仓库和模块，再用错误文本、类名、API 或配置键执行带路径的 `git grep`；只有命中代码的直接调用链跨模块时才能扩大一次范围。不得遍历构建产物、依赖、缓存、测试报告和无关产品目录。
 
 ## 查询
 
