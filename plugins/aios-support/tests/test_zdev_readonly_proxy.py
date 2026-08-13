@@ -107,13 +107,13 @@ for line in sys.stdin:
             response = self.request(process, {"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}})
             tools = response["result"]["tools"]
             self.assertEqual(
-                ["confluence_search", "jira_search"],
+                ["aios_refresh_code_mirrors", "confluence_search", "jira_search"],
                 sorted(tool["name"] for tool in tools),
             )
             for tool in tools:
                 self.assertFalse(tool["annotations"]["destructiveHint"])
                 self.assertTrue(tool["annotations"]["idempotentHint"])
-                self.assertTrue(tool["annotations"]["readOnlyHint"])
+                self.assertEqual(tool["name"] != "aios_refresh_code_mirrors", tool["annotations"]["readOnlyHint"])
         finally:
             self.stop_proxy(process)
 

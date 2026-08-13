@@ -20,7 +20,7 @@ const SUPPORT_TOOLS = new Set([
   'jira_get_transitions',
   'jira_search',
 ]);
-const mode = process.env.AIOS_ZDEV_MODE || 'local';
+const mode = process.env.AIOS_ZDEV_MODE || 'support';
 if (!['local', 'support', 'sync'].includes(mode)) throw new Error('invalid AIOS_ZDEV_MODE');
 const allowedTools = mode === 'support' ? SUPPORT_TOOLS : new Set();
 
@@ -45,7 +45,7 @@ const refreshConfig = {
   repositoryMap: process.env.AIOS_REPOSITORY_MAP,
 };
 const refreshEnabled = Object.values(refreshConfig).every((value) => typeof value === 'string' && value.length > 0);
-const refreshAvailable = refreshEnabled && mode === 'sync';
+const refreshAvailable = refreshEnabled && mode !== 'local';
 
 function send(message) {
   process.stdout.write(`${JSON.stringify(message)}\n`);
