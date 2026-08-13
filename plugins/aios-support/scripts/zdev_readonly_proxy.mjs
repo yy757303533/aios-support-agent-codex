@@ -7,6 +7,8 @@ import { spawn } from 'node:child_process';
 
 const REFRESH_TOOL = 'aios_refresh_code_mirrors';
 const LOCAL_SEARCH_TOOL = 'aios_search_local_code';
+const MAX_LOCAL_SEARCH_CALLS = 4;
+let localSearchCalls = 0;
 
 const SUPPORT_TOOLS = new Set([
   'confluence_get_page',
@@ -81,6 +83,10 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
   }
   const method = request.method;
   if (method === 'tools/call' && request.params?.name === LOCAL_SEARCH_TOOL && searchAvailable) {
+    if (localSearchCalls >= MAX_LOCAL_SEARCH_CALLS) {
+      deny(request, 'local_code_search_budget_exhausted_use_existing_evidence_and_answer');
+      return;
+    }
     const args = request.params?.arguments;
     const version = args?.version || searchConfig.defaultVersion;
     const terms = args?.terms;
@@ -97,6 +103,7 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
       deny(request, 'local_code_search_input_invalid');
       return;
     }
+    localSearchCalls += 1;
     const command = [
       searchConfig.script,
       '--mirror-root', searchConfig.mirrorRoot,
@@ -104,7 +111,7 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
       '--version-sets', searchConfig.versionSets,
       '--version', version,
       '--terms-json', JSON.stringify(terms),
-      '--max-results', '80',
+      '--max-results', '30',
     ];
     if (repositories !== undefined) command.push('--repositories-json', JSON.stringify(repositories));
     const child = spawn('python3', command, { stdio: ['ignore', 'pipe', 'ignore'] });

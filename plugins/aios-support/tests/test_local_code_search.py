@@ -10,7 +10,7 @@ from pathlib import Path
 PLUGIN_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PLUGIN_ROOT / "scripts"))
 
-from search_local_code import search, search_scopes  # noqa: E402
+from search_local_code import relevant_path, search, search_scopes  # noqa: E402
 
 
 class LocalCodeSearchTest(unittest.TestCase):
@@ -84,6 +84,13 @@ class LocalCodeSearchTest(unittest.TestCase):
             2,
         )
         self.assertEqual(["aios", "premium"], [match["repository"] for match in result["matches"]])
+
+    def test_filters_generic_terms_and_generated_paths(self) -> None:
+        result = search(self.mirrors, self.repository_map, self.version_sets, "5.5.30", ["version", "dGPU"], None, 10)
+        self.assertEqual(["dGPU"], result["terms"])
+        self.assertFalse(relevant_path("packages/app/@mf-types/generated.d.ts"))
+        self.assertFalse(relevant_path("packages/app/public/i18n/zh-CN.json"))
+        self.assertTrue(relevant_path("packages/app/ai-store/gpu.ts"))
 
 
 if __name__ == "__main__":

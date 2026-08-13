@@ -222,6 +222,34 @@ for line in sys.stdin:
         finally:
             self.stop_proxy(process)
 
+    def test_local_search_budget_stops_agent_loops(self) -> None:
+        process = self.start_proxy()
+        try:
+            for request_id in range(10, 14):
+                response = self.request(
+                    process,
+                    {
+                        "jsonrpc": "2.0",
+                        "id": request_id,
+                        "method": "tools/call",
+                        "params": {"name": "aios_search_local_code", "arguments": {"terms": ["dGPU"]}},
+                    },
+                )
+                self.assertFalse(response["result"]["isError"])
+            blocked = self.request(
+                process,
+                {
+                    "jsonrpc": "2.0",
+                    "id": 14,
+                    "method": "tools/call",
+                    "params": {"name": "aios_search_local_code", "arguments": {"terms": ["GuestTools"]}},
+                },
+            )
+            self.assertTrue(blocked["result"]["isError"])
+            self.assertIn("budget_exhausted", blocked["result"]["content"][0]["text"])
+        finally:
+            self.stop_proxy(process)
+
 
 if __name__ == "__main__":
     unittest.main()

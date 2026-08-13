@@ -18,6 +18,8 @@ MAX_RESULTS = 200
 AI_SCOPE = ":(glob,icase)**/ai*/**"
 GPU_SCOPES = [":(glob,icase)**/*gpu*/**"]
 GUEST_TOOLS_SCOPES = [":(glob,icase)**/*guesttool*/**"]
+GENERIC_TERMS = {"version", "state", "status", "compare", "check", "版本", "状态"}
+IGNORED_PATH_PARTS = {".gitconfig", "@mf-types"}
 
 
 def parse_string_list(raw: str, field: str) -> list[str]:
@@ -60,6 +62,11 @@ def git_grep(mirror: Path, commit: str, terms: list[str], scopes: list[str]) -> 
     return result.stdout.splitlines()
 
 
+def relevant_path(path: str) -> bool:
+    parts = set(Path(path).parts)
+    return not (parts & IGNORED_PATH_PARTS) and "/public/i18n/" not in f"/{path}"
+
+
 def search(
     mirror_root: Path,
     repository_map_path: Path,
@@ -71,6 +78,9 @@ def search(
 ) -> dict:
     if len(terms) > MAX_TERMS or any(not term.strip() or len(term) > MAX_TERM_CHARS or "\n" in term for term in terms):
         raise ValueError("terms_invalid")
+    terms = list(dict.fromkeys(term.strip() for term in terms if term.strip().lower() not in GENERIC_TERMS))
+    if not terms:
+        raise ValueError("terms_too_generic")
     repository_map = load_json(repository_map_path)
     configured = repository_map.get("repositories")
     version_sets = load_json(version_sets_path).get("version_sets")
@@ -105,6 +115,8 @@ def search(
             path, separator, remainder = line.partition(":")
             line_number, separator2, text = remainder.partition(":")
             if not separator or not separator2 or not line_number.isdigit():
+                continue
+            if not relevant_path(path):
                 continue
             repository_matches.append(
                 {"repository": repository, "path": path, "line": int(line_number), "text": text[:500]}
