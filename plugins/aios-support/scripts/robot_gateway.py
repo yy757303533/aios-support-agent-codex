@@ -78,9 +78,9 @@ def code_terms(question: str) -> list[str]:
     terms: list[str] = []
     lowered = question.lower()
     if "dgpu" in lowered or "gpu" in lowered or "显卡" in question:
-        terms.extend(["dGPU", "DGpu", "NotInitialized", "Uninitialized"])
+        terms.extend(["dGPU", "DGpuStatus", "Unknown"])
     if "guesttools" in lowered or "guest tools" in lowered or "性能优化工具" in question:
-        terms.extend(["GuestTools", "guestToolsVersion", "linuxUpdateTooltip", "compareTo"])
+        terms.extend(["GuestTools", "GuestToolsVersion", "isInNewFormat", "linuxUpdateTooltip"])
     ignored = {"aios", "version", "source", "code", "local"}
     terms.extend(
         code_term

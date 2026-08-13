@@ -67,6 +67,13 @@ def relevant_path(path: str) -> bool:
     return not (parts & IGNORED_PATH_PARTS) and "/public/i18n/" not in f"/{path}"
 
 
+def git_line_path(line: str, commit: str) -> str:
+    revision_prefix = f"{commit}:"
+    if line.startswith(revision_prefix):
+        line = line[len(revision_prefix):]
+    return line.partition(":")[0]
+
+
 def search(
     mirror_root: Path,
     repository_map_path: Path,
@@ -112,10 +119,19 @@ def search(
         seen_lines: set[str] = set()
         for term in terms:
             term_matches = git_grep(mirror, entry["commit"], [term], scopes)
-            for line in term_matches[:2]:
+            sampled = 0
+            for line in term_matches:
+                path = git_line_path(line, entry["commit"])
+                if not relevant_path(path):
+                    continue
+                if "/billing/" in f"/{path}" and not any("bill" in value.lower() for value in terms):
+                    continue
                 if line not in seen_lines:
                     candidate_lines.append(line)
                     seen_lines.add(line)
+                    sampled += 1
+                if sampled == 2:
+                    break
         for line in candidate_lines:
             revision_prefix = f"{entry['commit']}:"
             if line.startswith(revision_prefix):
