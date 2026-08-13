@@ -40,7 +40,7 @@ sys.exit(int(os.environ.get('FAKE_CODEX_EXIT', '0')))
         self.prompt_file = self.root / "prompt"
         self.search_script = self.root / "search.py"
         self.search_script.write_text(
-            "import json\nprint(json.dumps({'version':'5.5.30','complete':True,'matches':[{'repository':'aios','path':'devops/run.sh','line':339,'text':'dGPU profile'}]}))\n",
+            "import json\nprint(json.dumps({'version':'5.5.30','complete':True,'matches':[{'repository':'aios','path':'devops/run.sh','line':339,'text':'dGPU profile'}],'evidence_files':[{'repository':'aios','path':'devops/run.sh','line_start':331,'line_end':347,'content':'339: dGPU profile'}]}))\n",
             encoding="utf-8",
         )
         self.mirror_root = self.root / "mirrors"
@@ -131,11 +131,11 @@ sys.exit(int(os.environ.get('FAKE_CODEX_EXIT', '0')))
         self.assertEqual(0, result.returncode)
         self.assertEqual("直接回答，不要求 JSON。\n", result.stdout)
 
-    def test_local_support_question_keeps_support_only_mode(self) -> None:
+    def test_domain_support_question_uses_precomputed_local_evidence(self) -> None:
         result = self.run_gateway("AIOS 5.5.30 的 dGPU 为什么未初始化？", "本地结论")
 
         self.assertEqual(0, result.returncode)
-        self.assertEqual("support", self.mode_file.read_text(encoding="utf-8"))
+        self.assertEqual("evidence", self.mode_file.read_text(encoding="utf-8"))
 
     def test_explicit_jira_question_keeps_zdev_available(self) -> None:
         result = self.run_gateway("请查询 Jira AIOS-123", "Jira 结论")

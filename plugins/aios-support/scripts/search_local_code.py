@@ -15,6 +15,9 @@ from resolve_code_context import load_json, resolve_context
 MAX_TERMS = 8
 MAX_TERM_CHARS = 128
 MAX_RESULTS = 200
+MAX_EVIDENCE_FILES = 8
+MAX_EVIDENCE_CHARS = 24_000
+CONTEXT_LINES = 8
 AI_SCOPE = ":(glob,icase)**/ai*/**"
 GPU_SCOPES = [":(glob,icase)**/*gpu*/**"]
 GUEST_TOOLS_SCOPES = [":(glob,icase)**/*guesttool*/**"]
@@ -72,6 +75,35 @@ def git_line_path(line: str, commit: str) -> str:
     if line.startswith(revision_prefix):
         line = line[len(revision_prefix):]
     return line.partition(":")[0]
+
+
+def match_score(match: dict, terms: list[str]) -> int:
+    path = str(match["path"]).lower()
+    text = str(match["text"]).lower()
+    score = sum(4 + min(len(term), 24) for term in terms if term.lower() in text)
+    score += sum(8 for term in terms if term.lower() in path)
+    if Path(path).suffix.lower() in {".java", ".py", ".ts", ".tsx", ".go", ".groovy", ".sh"}:
+        score += 6
+    if any(part in path for part in ("/test/", "/tests/", "/doc/", "/docs/")):
+        score -= 5
+    return score
+
+
+def file_excerpt(mirror: Path, commit: str, path: str, lines: list[int]) -> dict | None:
+    result = subprocess.run(
+        ["git", f"--git-dir={mirror}", "show", f"{commit}:{path}"],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+    if result.returncode != 0 or len(result.stdout) > 500_000:
+        return None
+    source = result.stdout.splitlines()
+    start = max(1, min(lines) - CONTEXT_LINES)
+    end = min(len(source), max(lines) + CONTEXT_LINES)
+    content = "\n".join(f"{number}: {source[number - 1]}" for number in range(start, end + 1))
+    return {"line_start": start, "line_end": end, "content": content}
 
 
 def search(
@@ -152,12 +184,41 @@ def search(
     if remaining > 0:
         matches.extend(overflow[:remaining])
         truncated = truncated or len(overflow) > remaining
+    for match in matches:
+        match["score"] = match_score(match, terms)
+    matches.sort(key=lambda item: (-int(item["score"]), str(item["repository"]), str(item["path"]), int(item["line"])))
+
+    grouped: dict[tuple[str, str], list[dict]] = {}
+    for match in matches:
+        grouped.setdefault((str(match["repository"]), str(match["path"])), []).append(match)
+    ranked_files = sorted(
+        grouped.items(),
+        key=lambda item: (-max(int(match["score"]) for match in item[1]), item[0][0], item[0][1]),
+    )
+    evidence_files: list[dict] = []
+    evidence_chars = 0
+    for (repository, path), file_matches in ranked_files[:MAX_EVIDENCE_FILES]:
+        entry = context["repositories"][repository]
+        mirror = repository_mirror(mirror_root, entry["mirror"])
+        excerpt = file_excerpt(mirror, entry["commit"], path, [int(match["line"]) for match in file_matches])
+        if excerpt is None or evidence_chars + len(excerpt["content"]) > MAX_EVIDENCE_CHARS:
+            continue
+        evidence_chars += len(excerpt["content"])
+        evidence_files.append({
+            "repository": repository,
+            "commit": entry["commit"],
+            "path": path,
+            "score": max(int(match["score"]) for match in file_matches),
+            "matched_lines": [int(match["line"]) for match in file_matches],
+            **excerpt,
+        })
     return {
         "version": version,
         "complete": True,
         "terms": terms,
         "scanned": scanned,
         "matches": matches,
+        "evidence_files": evidence_files,
         "truncated": truncated,
     }
 

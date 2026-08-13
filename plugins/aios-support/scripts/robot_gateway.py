@@ -23,7 +23,11 @@ SAFE_VALUE = re.compile(r"[A-Za-z0-9._-]{1,128}")
 AIOS_VERSION = re.compile(r"(?i)\bAIOS\s*(?:版本\s*)?(\d+\.\d+\.\d+)\b")
 ZDEV_REQUEST = re.compile(r"(?i)\b(?:jira|confluence)\b|工单")
 CODE_SYNC_REQUEST = re.compile(r"(?:同步|更新|拉取).{0,8}(?:代码|五仓|镜像)|(?:代码|五仓|镜像).{0,8}(?:同步|更新|拉取)")
-CODE_LOOKUP_REQUEST = re.compile(r"源码|查代码|代码实现|调用链|logger|错误生成位置|类名|方法实现")
+CODE_LOOKUP_REQUEST = re.compile(
+    r"源码|查代码|代码实现|调用链|logger|错误生成位置|类名|方法实现|"
+    r"(?i:\b(?:vllm|sglang|zsml|modelservice|guesttools|dgpu|gpu|traceback|exception)\b)|"
+    r"性能优化工具|推理服务|模型加载|未初始化|状态异常"
+)
 CODE_IDENTIFIER = re.compile(r"[A-Za-z][A-Za-z0-9_.:-]{2,127}")
 
 
@@ -115,7 +119,11 @@ def collect_code_evidence(policy: dict, version: str, version_sets_path: Path, q
         payload = json.loads(result.stdout)
     except json.JSONDecodeError as exc:
         raise GatewayError("local_code_search_failed") from exc
-    if payload.get("complete") is not True or not isinstance(payload.get("matches"), list):
+    if (
+        payload.get("complete") is not True
+        or not isinstance(payload.get("matches"), list)
+        or not isinstance(payload.get("evidence_files"), list)
+    ):
         raise GatewayError("local_code_search_failed")
     return json.dumps(payload, ensure_ascii=False)
 
@@ -129,7 +137,7 @@ def build_prompt(
     code_evidence: str | None = None,
 ) -> str:
     code_rule = (
-        f"Local source evidence has already been collected from the immutable {version} snapshot. Do not call tools or inspect the filesystem. Base source claims only on the supplied paths and snippets."
+        f"Local source evidence has already been collected from the immutable {version} snapshot. Do not call tools or inspect the filesystem. Prioritize evidence_files, which contain ranked source context with line numbers; use matches only as secondary location hints."
         if code_lookup
         else "Do not inspect the filesystem or source code. Answer directly from the injected local knowledge."
     )

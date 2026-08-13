@@ -63,6 +63,8 @@ class LocalCodeSearchTest(unittest.TestCase):
         self.assertEqual({"aios", "premium"}, {match["repository"] for match in result["matches"]})
         self.assertEqual(["<entire-repository>"], result["scanned"][0]["scopes"])
         self.assertIn(":(glob,icase)**/ai*/**", result["scanned"][1]["scopes"])
+        self.assertTrue(result["evidence_files"])
+        self.assertIn("dGPU initialization", result["evidence_files"][0]["content"])
 
     def test_rejects_unknown_version(self) -> None:
         with self.assertRaisesRegex(ValueError, "version_unknown"):
