@@ -33,6 +33,8 @@ ZStack终极知识库/ZStack AIOS 智塔
 
 当前 `dws` 路径仅用于不含真实客户材料的开发验证，不构成生产连接器安全边界。
 
+机器人运行时只读取 `/var/lib/aios-support/knowledge/current` 指向的已审核快照。批准来源在 `config/knowledge-sources.json` 中精确限定；同步必须人工执行 `scripts/sync_knowledge.py prepare`，审核后再执行 `publish --confirm-reviewed`。不得配置定时同步，也不得将候选目录传给机器人。
+
 ## 本地源码
 
 源码通过 `AIOS_CODE_MIRROR_ROOT` 下的五个 bare mirror 读取，不属于远端 MCP。脚本不提供 checkout、fetch、pull、push 或文件写入能力。

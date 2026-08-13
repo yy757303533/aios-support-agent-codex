@@ -38,6 +38,13 @@ class LogKnowledgeMapTest(unittest.TestCase):
         self.assertIn("logs-and-code-map.md", event_skill)
         self.assertIn("startup.log", event_skill.split("---", 2)[1])
 
+    def test_knowledge_skill_requires_reviewed_manual_cache_publication(self) -> None:
+        skill = (PLUGIN_ROOT / "skills" / "knowledge-verification" / "SKILL.md").read_text(encoding="utf-8")
+        readme = (PLUGIN_ROOT / "README.md").read_text(encoding="utf-8")
+        for phrase in ("sync_knowledge.py", "pending_review", "current", "不得定时"):
+            self.assertIn(phrase, skill)
+        self.assertIn("禁止定时同步", readme)
+
 
 if __name__ == "__main__":
     unittest.main()

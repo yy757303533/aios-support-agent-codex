@@ -33,6 +33,22 @@ TAVILY_HIKARI_TOKEN
 
 售后日志先通过内置日志与代码地图定位 MN、Host、VM、Container、Model Center 或 Storage 层，再在目标版本 CodeContext 中反查错误生成点、logger 调用点和直接调用方。源码无命中或日志来源不明时保留 `unknown`，不得猜测归属。
 
+钉钉知识使用人工双阶段发布：`scripts/sync_knowledge.py prepare` 生成已脱敏的 `pending_review` 候选，审核后用 `publish --confirm-reviewed` 发布不可变 release 并原子切换 `current`。禁止定时同步，禁止提交知识正文到 Git，禁止从未审核候选回答。
+
+```bash
+python3 scripts/sync_knowledge.py prepare \
+  --sources config/knowledge-sources.json \
+  --candidate-root /var/lib/aios-support/knowledge-candidates
+
+python3 scripts/sync_knowledge.py publish \
+  --candidate /var/lib/aios-support/knowledge-candidates/<snapshot-id> \
+  --destination /var/lib/aios-support/knowledge \
+  --confirm-reviewed \
+  --reviewed-by <reviewer>
+```
+
+机器人只挂载 `/var/lib/aios-support/knowledge/current`。发布前必须人工检查候选 manifest、脱敏统计和切片内容；需要更新发布资料时重新执行上述流程。
+
 ## 发布状态
 
 当前仓库是本地开发/验证插件，不是可直接上线的钉钉生产网关。CLI 门禁属于纵深防御，不能替代服务端身份和发送出口。生产机器人必须先完成服务端受众/RBAC 绑定、钉钉回调验签和防重放、唯一 fail-closed 发送适配器、TLS 或 mTLS 内部连接器、运行时 `tools/list` 校验、限流和审计；任一项缺失即禁止接入真实客户材料或自动发送答案。
@@ -48,7 +64,7 @@ git clone --mirror <zstack-utility-url> "$AIOS_CODE_MIRROR_ROOT/zstack-utility.g
 git clone --mirror <zstack-ui-next-url> "$AIOS_CODE_MIRROR_ROOT/zstack-ui-next.git"
 ```
 
-定时更新使用 `git --git-dir=<mirror> fetch --prune`。问答期间不执行 fetch，保证本次 CodeContext 不移动。源码查询必须使用 resolver 生成的完整 CodeContext 文件，不能直接指定任意 commit。
+代码镜像只允许人工更新。问答期间不执行 fetch，保证本次 CodeContext 不移动。源码查询必须使用 resolver 生成的完整 CodeContext 文件，不能直接指定任意 commit。
 
 ## 版本配置
 
