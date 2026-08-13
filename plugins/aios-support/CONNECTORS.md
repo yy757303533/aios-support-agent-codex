@@ -14,6 +14,7 @@
 - 认证：`ATLASSIAN_AUTHORIZATION`
 - 权限：搜索、读取工单/版本/页面树
 - 禁止：创建、更新、评论、流转、上传和附件下载
+- 当前状态：直连默认禁用；机器人通过下方 `zdev_readonly` 代理查询 Jira/Confluence，避免重复连接不可达的 HTTP MCP。
 
 ## Tavily
 

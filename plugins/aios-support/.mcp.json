@@ -30,7 +30,7 @@
       "env_http_headers": {
         "Authorization": "ATLASSIAN_AUTHORIZATION"
       },
-      "enabled": true,
+      "enabled": false,
       "default_tools_approval_mode": "writes",
       "enabled_tools": [
         "jira_search",
