@@ -8,7 +8,7 @@
 | `aios-version-resolver` | 产品版本/开发分支解析为五仓库 commit |
 | `aios-source-verification` | bare mirror 只读源码查询 |
 | `aios-knowledge-verification` | 钉钉 AIOS 知识库查证 |
-| `aios-event-analysis` | 多来源故障分析 |
+| `aios-event-analysis` | 日志归属、对应版本代码反查与多来源故障分析 |
 | `aios-connectivity-check` | 安装和数据源验收 |
 | `aios-redaction-review` | internal/sales/customer 发送前脱敏门禁 |
 
@@ -30,6 +30,8 @@ TAVILY_HIKARI_TOKEN
 不要将任何变量值写入仓库、聊天、截图或工单。
 
 所有连接器查询文本先通过 `scripts/sanitize_query.py`，所有机器人答案在发送前通过 `scripts/validate_answer.py`。插件安装测试会执行严格 MCP 策略和秘密扫描。
+
+售后日志先通过内置日志与代码地图定位 MN、Host、VM、Container、Model Center 或 Storage 层，再在目标版本 CodeContext 中反查错误生成点、logger 调用点和直接调用方。源码无命中或日志来源不明时保留 `unknown`，不得猜测归属。
 
 ## 发布状态
 

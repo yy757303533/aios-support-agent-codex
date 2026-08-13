@@ -1,6 +1,6 @@
 {
   "name": "aios-support",
-  "version": "0.1.0+codex.20260813071515",
+  "version": "0.1.0+codex.20260813073843",
   "description": "Read-only, version-aware AIOS support analysis for Codex.",
   "author": {
     "name": "AIOS Support Team",
@@ -19,8 +19,8 @@
   "mcpServers": "./.mcp.json",
   "interface": {
     "displayName": "AIOS Support Agent",
-    "shortDescription": "AIOS 多版本问答、源码查证与故障分析。",
-    "longDescription": "面向 AIOS 销售与技术支持场景的只读 Codex 插件。按产品版本解析 aios、zstack、premium、zstack-utility、zstack-ui-next 的不可变代码上下文，结合钉钉知识库、BBS、Jira、Confluence 和公开资料进行证据优先查证。",
+    "shortDescription": "AIOS \u591a\u7248\u672c\u95ee\u7b54\u3001\u6e90\u7801\u67e5\u8bc1\u4e0e\u6545\u969c\u5206\u6790\u3002",
+    "longDescription": "\u9762\u5411 AIOS \u9500\u552e\u4e0e\u6280\u672f\u652f\u6301\u573a\u666f\u7684\u53ea\u8bfb Codex \u63d2\u4ef6\u3002\u6309\u4ea7\u54c1\u7248\u672c\u89e3\u6790 aios\u3001zstack\u3001premium\u3001zstack-utility\u3001zstack-ui-next \u7684\u4e0d\u53ef\u53d8\u4ee3\u7801\u4e0a\u4e0b\u6587\uff0c\u7ed3\u5408\u9489\u9489\u77e5\u8bc6\u5e93\u3001BBS\u3001Jira\u3001Confluence \u548c\u516c\u5f00\u8d44\u6599\u8fdb\u884c\u8bc1\u636e\u4f18\u5148\u67e5\u8bc1\u3002",
     "developerName": "AIOS Support Team",
     "category": "Engineering",
     "capabilities": [
@@ -30,9 +30,9 @@
       "Analysis"
     ],
     "defaultPrompt": [
-      "@aios-support-qa 5.5.28 支持哪些推理框架？",
-      "@aios-source-verification 查询模型服务入口的前后端实现",
-      "@aios-event-analysis 分析这段已脱敏的推理服务错误"
+      "@aios-support-qa 5.5.28 \u652f\u6301\u54ea\u4e9b\u63a8\u7406\u6846\u67b6\uff1f",
+      "@aios-source-verification \u67e5\u8be2\u6a21\u578b\u670d\u52a1\u5165\u53e3\u7684\u524d\u540e\u7aef\u5b9e\u73b0",
+      "@aios-event-analysis \u5206\u6790\u8fd9\u6bb5\u5df2\u8131\u654f\u7684\u63a8\u7406\u670d\u52a1\u9519\u8bef"
     ],
     "brandColor": "#2563EB"
   }

@@ -11,4 +11,5 @@ description: AIOS Support 插件的内部方法论、来源策略、回答契约
 - [answer-contract.md](references/answer-contract.md)：结构化答案和受众边界。
 - [repository-routing.md](references/repository-routing.md)：AIOS 五仓库路由。
 - [aios-domain-map.md](references/aios-domain-map.md)：稳定业务域和排障入口地图。
+- [logs-and-code-map.md](references/logs-and-code-map.md)：售后日志到组件、进程、仓库、代码和跨层时间线的定位地图。
 - [security-policy.md](references/security-policy.md)：只读权限、提示注入和脱敏要求。
