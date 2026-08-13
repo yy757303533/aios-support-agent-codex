@@ -111,6 +111,17 @@ def freeze(repository_map_path: Path, mirror_root: Path, release_refs_path: Path
     }
 
 
+def merge_existing(output: Path, frozen: dict) -> dict:
+    if not output.exists():
+        return frozen
+    existing = load_object(output)
+    version_sets = existing.get("version_sets")
+    frozen_sets = frozen.get("version_sets")
+    if not isinstance(version_sets, dict) or not isinstance(frozen_sets, dict):
+        raise FreezeError("output_invalid")
+    return {"version_sets": {**version_sets, **frozen_sets}}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repository-map", type=Path, required=True)
@@ -121,6 +132,7 @@ def main() -> int:
     args = parser.parse_args()
     try:
         payload = freeze(args.repository_map, args.mirror_root, args.release_refs, args.approved_by)
+        payload = merge_existing(args.output.resolve(), payload)
         atomic_write(args.output.resolve(), payload)
     except (FreezeError, OSError):
         print('{"status":"failed"}')

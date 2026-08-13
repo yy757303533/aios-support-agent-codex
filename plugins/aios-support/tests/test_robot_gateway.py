@@ -24,6 +24,7 @@ import pathlib
 import sys
 
 pathlib.Path(os.environ['FAKE_CODEX_MARKER']).touch()
+pathlib.Path(os.environ['FAKE_CODEX_ARGS']).write_text('\\n'.join(sys.argv), encoding='utf-8')
 output = pathlib.Path(sys.argv[sys.argv.index('-o') + 1])
 output.write_text(os.environ['FAKE_CODEX_ANSWER'], encoding='utf-8')
 sys.exit(int(os.environ.get('FAKE_CODEX_EXIT', '0')))
@@ -32,6 +33,7 @@ sys.exit(int(os.environ.get('FAKE_CODEX_EXIT', '0')))
         )
         self.fake_codex.chmod(0o700)
         self.policy = self.root / "policy.json"
+        self.args_file = self.root / "args"
         self.policy.write_text(
             json.dumps(
                 {
@@ -56,6 +58,7 @@ sys.exit(int(os.environ.get('FAKE_CODEX_EXIT', '0')))
                 "AIOS_GATEWAY_POLICY": str(self.policy),
                 "AIOS_CODEX_BIN": str(self.fake_codex),
                 "FAKE_CODEX_MARKER": str(self.marker),
+                "FAKE_CODEX_ARGS": str(self.args_file),
                 "FAKE_CODEX_ANSWER": answer,
                 "FAKE_CODEX_EXIT": str(exit_code),
             }
@@ -102,6 +105,30 @@ sys.exit(int(os.environ.get('FAKE_CODEX_EXIT', '0')))
 
         self.assertEqual(0, result.returncode)
         self.assertEqual("直接回答，不要求 JSON。\n", result.stdout)
+
+    def test_local_support_question_disables_remote_connectors(self) -> None:
+        result = self.run_gateway("AIOS 5.5.30 的 dGPU 为什么未初始化？", "本地结论")
+
+        self.assertEqual(0, result.returncode)
+        arguments = self.args_file.read_text(encoding="utf-8")
+        self.assertIn("mcp_servers.zdev_readonly.enabled=false", arguments)
+        self.assertIn('mcp_servers."zstack-bbs-support".enabled=false', arguments)
+        self.assertIn("mcp_servers.tavily_hikari.enabled=false", arguments)
+
+    def test_explicit_jira_question_keeps_zdev_available(self) -> None:
+        result = self.run_gateway("请查询 Jira AIOS-123", "Jira 结论")
+
+        self.assertEqual(0, result.returncode)
+        arguments = self.args_file.read_text(encoding="utf-8")
+        self.assertNotIn("mcp_servers.zdev_readonly.enabled=false", arguments)
+        self.assertIn('mcp_servers."zstack-bbs-support".enabled=false', arguments)
+
+    def test_gitlab_keyword_does_not_enable_remote_code_lookup(self) -> None:
+        result = self.run_gateway("去 GitLab 搜索这段代码", "本地代码结论")
+
+        self.assertEqual(0, result.returncode)
+        arguments = self.args_file.read_text(encoding="utf-8")
+        self.assertIn("mcp_servers.zdev_readonly.enabled=false", arguments)
 
 
 if __name__ == "__main__":

@@ -106,7 +106,7 @@ for line in sys.stdin:
             response = self.request(process, {"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}})
             tools = response["result"]["tools"]
             self.assertEqual(
-                ["aios_refresh_code_mirrors", "confluence_search", "gl_list_projects", "jira_search"],
+                ["aios_refresh_code_mirrors", "confluence_search", "jira_search"],
                 sorted(tool["name"] for tool in tools),
             )
             for tool in tools:
@@ -126,6 +126,23 @@ for line in sys.stdin:
                     "id": 2,
                     "method": "tools/call",
                     "params": {"name": "jira_add_comment", "arguments": {"body": "unsafe"}},
+                },
+            )
+            self.assertTrue(response["result"]["isError"])
+            self.assertEqual("tool_not_allowed", response["result"]["content"][0]["text"])
+        finally:
+            self.stop_proxy(process)
+
+    def test_denies_remote_gitlab_code_lookup(self) -> None:
+        process = self.start_proxy()
+        try:
+            response = self.request(
+                process,
+                {
+                    "jsonrpc": "2.0",
+                    "id": 5,
+                    "method": "tools/call",
+                    "params": {"name": "gl_list_projects", "arguments": {}},
                 },
             )
             self.assertTrue(response["result"]["isError"])

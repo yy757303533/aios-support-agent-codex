@@ -104,6 +104,37 @@ class FreezeVersionSetTest(unittest.TestCase):
         self.assertEqual("preserve", output.read_text(encoding="utf-8"))
         self.assertNotIn("missing-branch", result.stdout + result.stderr)
 
+    def test_preserves_previously_frozen_versions(self) -> None:
+        output = self.root / "version-sets.json"
+        output.write_text(
+            json.dumps({"version_sets": {"5.5.27": {"type": "release", "repositories": {}}}}),
+            encoding="utf-8",
+        )
+
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(SCRIPT),
+                "--repository-map",
+                str(REPOSITORY_MAP),
+                "--mirror-root",
+                str(self.mirrors),
+                "--release-refs",
+                str(self.refs_path),
+                "--output",
+                str(output),
+                "--approved-by",
+                "release-owner",
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        versions = json.loads(output.read_text(encoding="utf-8"))["version_sets"]
+        self.assertEqual({"5.5.27", "5.5.28"}, set(versions))
+
 
 if __name__ == "__main__":
     unittest.main()

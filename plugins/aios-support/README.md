@@ -33,7 +33,7 @@ TAVILY_HIKARI_TOKEN
 
 机器人必须通过 `scripts/robot_gateway.py` 作为唯一 Agent 命令运行。网关从 root-only 策略文件读取固定的 `internal` 受众，输入先脱敏，并用只读 sandbox 运行 Codex。内部群问答直接返回纯文本或 Markdown；模型调用失败时明确返回运行错误，不使用安全降级文案。不得把 DWS 直接连接到裸 `codex` 渠道。
 
-workspace 的 `zdev` 必须由 `scripts/configure_runtime.py mcp` 改造成禁用的 `zdev_upstream` 与启用的 `zdev_readonly`。只读代理仅暴露 GitLab/Jira/Confluence 查询工具；评论、修改 Issue、创建或更新 MR、提交和 push 均不可见且伪造调用会被拒绝。`aios_refresh_code_mirrors` 是唯一批准的本地写操作，只能对 `config/repository-map.json` 中登记的 bare mirror 执行 `git fetch --prune origin`，不 checkout、不 commit、不 push，并且不得配置定时执行。
+workspace 的 `zdev` 必须由 `scripts/configure_runtime.py mcp` 改造成禁用的 `zdev_upstream` 与启用的 `zdev_readonly`。只读代理只暴露 Jira 和 Confluence 查询工具，不暴露任何 GitLab 代码读取或搜索工具；源码始终查询开发机本地五仓或 bare mirror。评论、修改 Issue、提交和 push 均不可见且伪造调用会被拒绝。`aios_refresh_code_mirrors` 是唯一批准的本地写操作，只能对 `config/repository-map.json` 中登记的 bare mirror 执行 `git fetch --prune origin`，不 checkout、不 commit、不 push，并且不得配置定时执行。
 
 售后日志先通过内置日志与代码地图定位 MN、Host、VM、Container、Model Center 或 Storage 层，再在目标版本 CodeContext 中反查错误生成点、logger 调用点和直接调用方。源码无命中或日志来源不明时保留 `unknown`，不得猜测归属。
 
@@ -72,4 +72,4 @@ git clone --mirror <zstack-ui-next-url> "$AIOS_CODE_MIRROR_ROOT/zstack-ui-next.g
 
 ## 版本配置
 
-`config/release-refs.json` 声明人工批准的发布分支映射。使用 `scripts/freeze_version_set.py` 从五个 bare mirror 将这些 ref 冻结为 40 位 commit，并输出 root-only 的正式运行清单；随后必须同时通过 `validate_version_sets.py` 和 `resolve_code_context.py --version`。分支继续移动不会改变已冻结清单，更新发布基线必须重新人工执行冻结流程。
+`config/release-refs*.json` 声明人工批准的发布分支映射。每次版本发布并人工同步本地代码后，使用 `scripts/freeze_version_set.py` 从五个 bare mirror 将对应 ref 冻结为 40 位 commit，并合并写入 root-only 的正式运行清单；随后必须同时通过 `validate_version_sets.py` 和 `resolve_code_context.py --version`。分支继续移动不会改变已冻结清单，更新发布基线必须重新人工执行冻结流程。

@@ -1,0 +1,10 @@
+{
+  "version": "5.5.30",
+  "refs": {
+    "aios": "master",
+    "zstack": "5.5.30",
+    "premium": "5.5.30",
+    "zstack-utility": "5.5.30",
+    "zstack-ui-next": "5.5.30"
+  }
+}
