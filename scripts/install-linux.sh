@@ -26,6 +26,35 @@ fi
 codex plugin marketplace add "$repo_root"
 codex plugin add "aios-support@$marketplace_name"
 
+workspace_root=$(cd "$repo_root/.." && pwd)
+workspace_mcp="$workspace_root/.mcp.json"
+mirror_root="$workspace_root/mirrors"
+plugin_root="$repo_root/plugins/aios-support"
+version_sets=${AIOS_VERSION_SETS_FILE:-/etc/aios-support/version-sets.json}
+if [[ -f "$workspace_mcp" && -d "$mirror_root" && -f "$version_sets" ]]; then
+  python3 "$plugin_root/scripts/configure_runtime.py" mcp \
+    --config "$workspace_mcp" \
+    --proxy "$plugin_root/scripts/zdev_readonly_proxy.mjs" \
+    --refresh-script "$plugin_root/scripts/refresh_mirrors.py" \
+    --search-script "$plugin_root/scripts/search_local_code.py" \
+    --mirror-root "$mirror_root" \
+    --repository-map "$plugin_root/config/repository-map.json" \
+    --version-sets "$version_sets"
+  if codex mcp get zdev_readonly --json >/dev/null 2>&1; then
+    codex mcp remove zdev_readonly
+  fi
+  codex mcp add zdev_readonly \
+    --env "ZDEV_MCP_CONFIG=$workspace_mcp" \
+    --env ZDEV_MCP_SERVER=zdev_upstream \
+    --env "AIOS_REFRESH_SCRIPT=$plugin_root/scripts/refresh_mirrors.py" \
+    --env "AIOS_LOCAL_SEARCH_SCRIPT=$plugin_root/scripts/search_local_code.py" \
+    --env "AIOS_MIRROR_ROOT=$mirror_root" \
+    --env "AIOS_REPOSITORY_MAP=$plugin_root/config/repository-map.json" \
+    --env "AIOS_VERSION_SETS_FILE=$version_sets" \
+    --env "AIOS_DEFAULT_VERSION=${AIOS_DEFAULT_VERSION:-5.5.30}" \
+    -- node "$plugin_root/scripts/zdev_readonly_proxy.mjs"
+fi
+
 expected_version=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["version"])' \
   "$repo_root/plugins/aios-support/.codex-plugin/plugin.json")
 installed_version=$(codex plugin list --json | python3 -c '
