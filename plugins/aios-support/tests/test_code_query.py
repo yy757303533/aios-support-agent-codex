@@ -20,7 +20,8 @@ class CodeQueryTest(unittest.TestCase):
             mirrors = root / "mirrors"
             working.mkdir()
             mirrors.mkdir()
-            subprocess.run(["git", "init", "-b", "main"], cwd=working, check=True, capture_output=True)
+            subprocess.run(["git", "init"], cwd=working, check=True, capture_output=True)
+            subprocess.run(["git", "checkout", "-b", "main"], cwd=working, check=True, capture_output=True)
             subprocess.run(["git", "config", "user.name", "Test"], cwd=working, check=True)
             subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=working, check=True)
             (working / "service.py").write_text("class ModelService:\n    pass\n", encoding="utf-8")

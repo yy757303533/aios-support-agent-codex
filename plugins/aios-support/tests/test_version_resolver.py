@@ -47,7 +47,8 @@ class VersionResolverTest(unittest.TestCase):
     def create_mirror(self, name: str, branch: str, filename: str) -> str:
         working = self.root / f"{name}-working"
         working.mkdir()
-        run("git", "init", "-b", branch, cwd=working)
+        run("git", "init", cwd=working)
+        run("git", "checkout", "-b", branch, cwd=working)
         run("git", "config", "user.name", "Test", cwd=working)
         run("git", "config", "user.email", "test@example.com", cwd=working)
         (working / filename).write_text("ModelService\n", encoding="utf-8")
