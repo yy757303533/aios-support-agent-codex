@@ -29,9 +29,9 @@ TAVILY_HIKARI_TOKEN
 
 不要将任何变量值写入仓库、聊天、截图或工单。
 
-所有连接器查询文本先通过 `scripts/sanitize_query.py`，所有机器人答案在发送前通过 `scripts/validate_answer.py`。插件安装测试会执行严格 MCP 策略和秘密扫描。
+所有连接器查询文本先通过 `scripts/sanitize_query.py`。`scripts/validate_answer.py` 保留给未来的销售或客户输出场景；当前内部售后机器人不执行结构化答案门禁。插件安装测试会执行严格 MCP 策略和秘密扫描。
 
-机器人必须通过 `scripts/robot_gateway.py` 作为唯一 Agent 命令运行。网关从 root-only 策略文件读取服务端受众，输入先脱敏，Codex 只能生成 `config/answer.schema.json` 约束的 JSON，答案校验通过后才渲染；任一步失败只返回固定降级文案。不得把 DWS 直接连接到裸 `codex` 渠道。
+机器人必须通过 `scripts/robot_gateway.py` 作为唯一 Agent 命令运行。网关从 root-only 策略文件读取固定的 `internal` 受众，输入先脱敏，并用只读 sandbox 运行 Codex。内部群问答直接返回纯文本或 Markdown；模型调用失败时明确返回运行错误，不使用安全降级文案。不得把 DWS 直接连接到裸 `codex` 渠道。
 
 workspace 的 `zdev` 必须由 `scripts/configure_runtime.py mcp` 改造成禁用的 `zdev_upstream` 与启用的 `zdev_readonly`。只读代理仅暴露 GitLab/Jira/Confluence 查询工具；评论、修改 Issue、创建或更新 MR、提交和 push 均不可见且伪造调用会被拒绝。`aios_refresh_code_mirrors` 是唯一批准的本地写操作，只能对 `config/repository-map.json` 中登记的 bare mirror 执行 `git fetch --prune origin`，不 checkout、不 commit、不 push，并且不得配置定时执行。
 
@@ -55,7 +55,7 @@ python3 scripts/sync_knowledge.py publish \
 
 ## 发布状态
 
-内部售后机器人只允许受控钉钉用户或群触发，DWS 必须配置 `--allowed-users` 或 `--allowed-groups`，受众固定为 `internal`。Codex 可以免交互执行代理暴露的查询和受控 mirror 更新，但不得暴露裸 `zdev` 或任意工作区写权限。BBS 端点没有 TLS/mTLS 时仍属于明确风险例外；切换到 HTTPS 代理前不得扩大到外部客户。
+内部售后机器人只在企业内部应用和内部群中使用，不维护人员白名单，受众固定为 `internal`。Codex 可以免交互执行代理暴露的查询和受控 mirror 更新，但不得暴露裸 `zdev` 或任意工作区写权限。BBS 没有 HTTPS 地址，当前按固定内网 HTTP 端点的只读风险例外运行；不得扩大到外部客户，也不得增加发帖或修改工具。
 
 ## 创建 bare mirror
 

@@ -49,4 +49,4 @@ sales 只允许 `official_product`、`public_docs`、`vendor_docs`、`dingtalk_k
 python3 scripts/validate_answer.py --authorized-audience sales < answer.json
 ```
 
-验证失败不得发送原答案，只返回固定安全降级消息。任何结论都不得静默丢弃 `uncertainties`。
+该验证合同用于销售或客户输出。当前仅供企业内部群使用的机器人直接返回纯文本或 Markdown，不调用此验证器；若未来扩大受众，必须重新启用结构化验证并绑定服务端授权。
