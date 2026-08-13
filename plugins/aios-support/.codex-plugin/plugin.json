@@ -1,6 +1,6 @@
 {
   "name": "aios-support",
-  "version": "0.1.0+codex.20260813093750",
+  "version": "0.1.0+codex.20260813094126",
   "description": "Read-only, version-aware AIOS support analysis for Codex.",
   "author": {
     "name": "AIOS Support Team",
