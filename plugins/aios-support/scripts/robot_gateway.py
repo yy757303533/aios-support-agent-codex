@@ -20,6 +20,7 @@ MODEL_UNAVAILABLE = "模型服务暂时不可用，请稍后重试。"
 QUERY_TIMEOUT = "本次本地查证超时，请缩小问题范围或补充准确版本后重试。"
 SAFE_VALUE = re.compile(r"[A-Za-z0-9._-]{1,128}")
 ZDEV_REQUEST = re.compile(r"(?i)\b(?:jira|confluence)\b|工单")
+CODE_SYNC_REQUEST = re.compile(r"(?:同步|更新|拉取).{0,8}(?:代码|五仓|镜像)|(?:代码|五仓|镜像).{0,8}(?:同步|更新|拉取)")
 BBS_REQUEST = re.compile(r"(?i)\bbbs\b|论坛")
 WEB_REQUEST = re.compile(r"(?i)\b(?:tavily|web)\b|联网搜索|互联网搜索|公开资料")
 
@@ -65,6 +66,7 @@ Answer the question normally in concise plain text or Markdown. Do not require a
 If the available evidence is incomplete, state exactly what is missing instead of inventing a conclusion.
 Prefer the injected local knowledge. For source verification, inspect the local workspace and local bare mirrors.
 Do not call GitLab, Jira, Confluence, BBS, or web search unless the user explicitly asks for that source.
+The only remote code maintenance action is aios_refresh_code_mirrors, and it may run only when the user explicitly asks to sync or update local code.
 
 Sanitized question:
 {question}
@@ -73,7 +75,7 @@ Sanitized question:
 
 def connector_overrides(question: str) -> list[str]:
     overrides = []
-    if not ZDEV_REQUEST.search(question):
+    if not (ZDEV_REQUEST.search(question) or CODE_SYNC_REQUEST.search(question)):
         overrides.extend(["-c", "mcp_servers.zdev_readonly.enabled=false"])
     if not BBS_REQUEST.search(question):
         overrides.extend(["-c", 'mcp_servers."zstack-bbs-support".enabled=false'])

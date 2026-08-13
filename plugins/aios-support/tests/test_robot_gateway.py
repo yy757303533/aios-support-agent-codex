@@ -130,6 +130,13 @@ sys.exit(int(os.environ.get('FAKE_CODEX_EXIT', '0')))
         arguments = self.args_file.read_text(encoding="utf-8")
         self.assertIn("mcp_servers.zdev_readonly.enabled=false", arguments)
 
+    def test_explicit_code_sync_request_enables_controlled_refresh_tool(self) -> None:
+        result = self.run_gateway("请同步本地五仓代码", "已更新")
+
+        self.assertEqual(0, result.returncode)
+        arguments = self.args_file.read_text(encoding="utf-8")
+        self.assertNotIn("mcp_servers.zdev_readonly.enabled=false", arguments)
+
 
 if __name__ == "__main__":
     unittest.main()
