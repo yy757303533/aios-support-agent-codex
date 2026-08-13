@@ -26,6 +26,7 @@ import sys
 pathlib.Path(os.environ['FAKE_CODEX_MARKER']).touch()
 pathlib.Path(os.environ['FAKE_CODEX_ARGS']).write_text('\\n'.join(sys.argv), encoding='utf-8')
 pathlib.Path(os.environ['FAKE_CODEX_MODE']).write_text(os.environ['AIOS_ZDEV_MODE'], encoding='utf-8')
+pathlib.Path(os.environ['FAKE_CODEX_PROMPT']).write_text(sys.stdin.read(), encoding='utf-8')
 output = pathlib.Path(sys.argv[sys.argv.index('-o') + 1])
 output.write_text(os.environ['FAKE_CODEX_ANSWER'], encoding='utf-8')
 sys.exit(int(os.environ.get('FAKE_CODEX_EXIT', '0')))
@@ -36,6 +37,16 @@ sys.exit(int(os.environ.get('FAKE_CODEX_EXIT', '0')))
         self.policy = self.root / "policy.json"
         self.args_file = self.root / "args"
         self.mode_file = self.root / "mode"
+        self.prompt_file = self.root / "prompt"
+        self.search_script = self.root / "search.py"
+        self.search_script.write_text(
+            "import json\nprint(json.dumps({'version':'5.5.30','complete':True,'matches':[{'repository':'aios','path':'devops/run.sh','line':339,'text':'dGPU profile'}]}))\n",
+            encoding="utf-8",
+        )
+        self.mirror_root = self.root / "mirrors"
+        self.mirror_root.mkdir()
+        self.repository_map = self.root / "repository-map.json"
+        self.repository_map.write_text('{"repositories":{}}', encoding="utf-8")
         self.version_sets = self.root / "version-sets.json"
         self.version_sets.write_text(
             json.dumps({"version_sets": {"5.5.28": {}, "5.5.30": {}}}),
@@ -69,8 +80,12 @@ sys.exit(int(os.environ.get('FAKE_CODEX_EXIT', '0')))
                 "FAKE_CODEX_MARKER": str(self.marker),
                 "FAKE_CODEX_ARGS": str(self.args_file),
                 "FAKE_CODEX_MODE": str(self.mode_file),
+                "FAKE_CODEX_PROMPT": str(self.prompt_file),
                 "FAKE_CODEX_ANSWER": answer,
                 "FAKE_CODEX_EXIT": str(exit_code),
+                "AIOS_LOCAL_SEARCH_SCRIPT": str(self.search_script),
+                "AIOS_CODE_MIRROR_ROOT": str(self.mirror_root),
+                "AIOS_REPOSITORY_MAP": str(self.repository_map),
             }
         )
         return subprocess.run(
@@ -156,7 +171,10 @@ sys.exit(int(os.environ.get('FAKE_CODEX_EXIT', '0')))
     def test_source_lookup_uses_workspace_but_normal_question_does_not(self) -> None:
         self.run_gateway("请查源码调用链", "源码结论")
         source_arguments = self.args_file.read_text(encoding="utf-8")
-        self.assertIn(str(PLUGIN_ROOT), source_arguments)
+        self.assertIn("--ignore-rules", source_arguments)
+        self.assertNotIn(str(PLUGIN_ROOT), source_arguments)
+        self.assertIn("devops/run.sh", self.prompt_file.read_text(encoding="utf-8"))
+        self.assertEqual("evidence", self.mode_file.read_text(encoding="utf-8"))
 
         self.run_gateway("dGPU 为什么未初始化", "知识结论")
         knowledge_arguments = self.args_file.read_text(encoding="utf-8")

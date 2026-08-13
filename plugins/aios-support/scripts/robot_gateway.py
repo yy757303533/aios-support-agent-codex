@@ -24,6 +24,7 @@ AIOS_VERSION = re.compile(r"(?i)\bAIOS\s*(?:版本\s*)?(\d+\.\d+\.\d+)\b")
 ZDEV_REQUEST = re.compile(r"(?i)\b(?:jira|confluence)\b|工单")
 CODE_SYNC_REQUEST = re.compile(r"(?:同步|更新|拉取).{0,8}(?:代码|五仓|镜像)|(?:代码|五仓|镜像).{0,8}(?:同步|更新|拉取)")
 CODE_LOOKUP_REQUEST = re.compile(r"源码|查代码|代码实现|调用链|logger|错误生成位置|类名|方法实现")
+CODE_IDENTIFIER = re.compile(r"[A-Za-z][A-Za-z0-9_.:-]{2,127}")
 
 
 class GatewayError(Exception):
@@ -73,9 +74,62 @@ def select_version(question: str, default_version: str, version_sets_path: Path)
     return version
 
 
-def build_prompt(question: str, audience: str, version: str, version_sets_path: Path, code_lookup: bool) -> str:
+def code_terms(question: str) -> list[str]:
+    terms: list[str] = []
+    lowered = question.lower()
+    if "dgpu" in lowered or "gpu" in lowered or "显卡" in question:
+        terms.extend(["dGPU", "DGpu", "NotInitialized", "Uninitialized"])
+    if "guesttools" in lowered or "guest tools" in lowered or "性能优化工具" in question:
+        terms.extend(["GuestTools", "guestToolsVersion", "linuxUpdateTooltip", "compareTo"])
+    ignored = {"aios", "version", "source", "code", "local"}
+    terms.extend(
+        code_term
+        for code_term in CODE_IDENTIFIER.findall(question)
+        if code_term.lower() not in ignored and not re.fullmatch(r"\d+(?:\.\d+)+", code_term)
+    )
+    return list(dict.fromkeys(terms))[:8] or ["AIOS"]
+
+
+def collect_code_evidence(policy: dict, version: str, version_sets_path: Path, question: str) -> str:
+    plugin_root = Path(__file__).resolve().parents[1]
+    search_script = Path(os.environ.get("AIOS_LOCAL_SEARCH_SCRIPT", plugin_root / "scripts" / "search_local_code.py"))
+    mirror_root = Path(os.environ.get("AIOS_CODE_MIRROR_ROOT", Path(policy["workspace"]) / "mirrors"))
+    repository_map = Path(os.environ.get("AIOS_REPOSITORY_MAP", plugin_root / "config" / "repository-map.json"))
+    command = [
+        sys.executable,
+        str(search_script),
+        "--mirror-root", str(mirror_root),
+        "--repository-map", str(repository_map),
+        "--version-sets", str(version_sets_path),
+        "--version", version,
+        "--terms-json", json.dumps(code_terms(question), ensure_ascii=False),
+        "--max-results", "30",
+    ]
+    try:
+        result = subprocess.run(command, text=True, capture_output=True, timeout=10, check=False)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise GatewayError("local_code_search_failed") from exc
+    if result.returncode != 0 or not result.stdout.strip() or len(result.stdout) > 80_000:
+        raise GatewayError("local_code_search_failed")
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        raise GatewayError("local_code_search_failed") from exc
+    if payload.get("complete") is not True or not isinstance(payload.get("matches"), list):
+        raise GatewayError("local_code_search_failed")
+    return json.dumps(payload, ensure_ascii=False)
+
+
+def build_prompt(
+    question: str,
+    audience: str,
+    version: str,
+    version_sets_path: Path,
+    code_lookup: bool,
+    code_evidence: str | None = None,
+) -> str:
     code_rule = (
-        f"Inspect only the local workspace and local bare mirrors. Bind source conclusions to {version} in {version_sets_path}."
+        f"Local source evidence has already been collected from the immutable {version} snapshot. Do not call tools or inspect the filesystem. Base source claims only on the supplied paths and snippets."
         if code_lookup
         else "Do not inspect the filesystem or source code. Answer directly from the injected local knowledge."
     )
@@ -93,6 +147,9 @@ The only remote code maintenance action is aios_refresh_code_mirrors, and it may
 
 Sanitized question:
 {question}
+
+Deterministically collected local source evidence:
+{code_evidence or "<not requested>"}
 """
 
 
@@ -108,12 +165,15 @@ def run_codex(policy: dict, codex_bin: Path, prompt: str, question: str) -> str:
     with tempfile.TemporaryDirectory(prefix="aios-gateway-") as directory:
         output = Path(directory) / "answer.txt"
         code_lookup = bool(CODE_LOOKUP_REQUEST.search(question))
-        workdir = Path(policy["workspace"]).resolve() if code_lookup else Path(directory)
+        workdir = Path(directory)
         command = [
             str(codex_bin),
             "exec",
             "--ephemeral",
             "--skip-git-repo-check",
+            "--ignore-rules",
+            "--disable",
+            "code_mode",
             "-C",
             str(workdir),
             "--sandbox",
@@ -122,6 +182,8 @@ def run_codex(policy: dict, codex_bin: Path, prompt: str, question: str) -> str:
             'approval_policy="never"',
             "-c",
             f'model_reasoning_effort="{"medium" if code_lookup else "low"}"',
+            "-c",
+            'plugins."aios-support@aios-support-marketplace".enabled=false',
             "-o",
             str(output),
             "-m",
@@ -135,7 +197,7 @@ def run_codex(policy: dict, codex_bin: Path, prompt: str, question: str) -> str:
                 text=True,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
-                env={**os.environ, "AIOS_ZDEV_MODE": zdev_mode(question)},
+                env={**os.environ, "AIOS_ZDEV_MODE": "evidence" if code_lookup else zdev_mode(question)},
                 timeout=policy["timeout_seconds"] if code_lookup else min(45, policy["timeout_seconds"]),
                 check=False,
             )
@@ -169,6 +231,10 @@ def main() -> int:
         return 0
     try:
         version = select_version(sanitized["sanitized"], policy["default_version"], version_sets_path)
+        code_lookup = bool(CODE_LOOKUP_REQUEST.search(sanitized["sanitized"]))
+        code_evidence = collect_code_evidence(
+            policy, version, version_sets_path, sanitized["sanitized"]
+        ) if code_lookup else None
         answer = run_codex(
             policy,
             codex_bin,
@@ -177,7 +243,8 @@ def main() -> int:
                 policy["audience"],
                 version,
                 version_sets_path,
-                bool(CODE_LOOKUP_REQUEST.search(sanitized["sanitized"])),
+                code_lookup,
+                code_evidence,
             ),
             sanitized["sanitized"],
         )

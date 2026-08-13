@@ -24,7 +24,7 @@ const SUPPORT_TOOLS = new Set([
   'jira_search',
 ]);
 const mode = process.env.AIOS_ZDEV_MODE || 'support';
-if (!['local', 'support', 'sync'].includes(mode)) throw new Error('invalid AIOS_ZDEV_MODE');
+if (!['evidence', 'local', 'support', 'sync'].includes(mode)) throw new Error('invalid AIOS_ZDEV_MODE');
 const allowedTools = mode === 'support' ? SUPPORT_TOOLS : new Set();
 
 const configPath = process.env.ZDEV_MCP_CONFIG;
@@ -56,7 +56,7 @@ const searchConfig = {
 };
 const refreshEnabled = Object.values(refreshConfig).every((value) => typeof value === 'string' && value.length > 0);
 const refreshAvailable = refreshEnabled && mode !== 'local';
-const searchAvailable = [searchConfig.script, searchConfig.mirrorRoot, searchConfig.repositoryMap, searchConfig.versionSets]
+const searchAvailable = mode !== 'evidence' && [searchConfig.script, searchConfig.mirrorRoot, searchConfig.repositoryMap, searchConfig.versionSets]
   .every((value) => typeof value === 'string' && value.length > 0);
 
 function send(message) {
