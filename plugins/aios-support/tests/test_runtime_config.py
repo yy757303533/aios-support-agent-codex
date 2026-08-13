@@ -37,7 +37,10 @@ class RuntimeConfigTest(unittest.TestCase):
         self.config.chmod(0o600)
         self.proxy = PLUGIN_ROOT / "scripts" / "zdev_readonly_proxy.mjs"
         self.refresh = PLUGIN_ROOT / "scripts" / "refresh_mirrors.py"
+        self.search = PLUGIN_ROOT / "scripts" / "search_local_code.py"
         self.repository_map = PLUGIN_ROOT / "config" / "repository-map.json"
+        self.version_sets = self.root / "version-sets.json"
+        self.version_sets.write_text('{"version_sets":{"5.5.30":{}}}', encoding="utf-8")
         self.mirror_root = self.root / "mirrors"
         self.mirror_root.mkdir()
 
@@ -56,10 +59,14 @@ class RuntimeConfigTest(unittest.TestCase):
                 str(self.proxy),
                 "--refresh-script",
                 str(self.refresh),
+                "--search-script",
+                str(self.search),
                 "--mirror-root",
                 str(self.mirror_root),
                 "--repository-map",
                 str(self.repository_map),
+                "--version-sets",
+                str(self.version_sets),
             ],
             text=True,
             capture_output=True,
@@ -84,8 +91,10 @@ class RuntimeConfigTest(unittest.TestCase):
                     "ZDEV_MCP_CONFIG": str(self.config.resolve()),
                     "ZDEV_MCP_SERVER": "zdev_upstream",
                     "AIOS_REFRESH_SCRIPT": str(self.refresh.resolve()),
+                    "AIOS_LOCAL_SEARCH_SCRIPT": str(self.search.resolve()),
                     "AIOS_MIRROR_ROOT": str(self.mirror_root.resolve()),
                     "AIOS_REPOSITORY_MAP": str(self.repository_map.resolve()),
+                    "AIOS_VERSION_SETS_FILE": str(self.version_sets.resolve()),
                 },
                 "enabled": True,
                 "default_tools_approval_mode": "never",

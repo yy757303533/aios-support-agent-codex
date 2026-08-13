@@ -62,6 +62,13 @@ for line in sys.stdin:
         self.repository_map.write_text('{"repositories":{}}', encoding="utf-8")
         self.refresh = self.root / "refresh.py"
         self.refresh.write_text("print('{\"status\":\"updated\",\"repositories\":[]}')\n", encoding="utf-8")
+        self.search = self.root / "search.py"
+        self.search.write_text(
+            "import json,sys\nprint(json.dumps({'version':sys.argv[sys.argv.index('--version')+1],'matches':[{'path':'ai.py','line':7}]}))\n",
+            encoding="utf-8",
+        )
+        self.version_sets = self.root / "version-sets.json"
+        self.version_sets.write_text('{"version_sets":{"5.5.30":{}}}', encoding="utf-8")
 
     def tearDown(self) -> None:
         self.temp.cleanup()
@@ -73,8 +80,11 @@ for line in sys.stdin:
                 "ZDEV_MCP_CONFIG": str(self.config),
                 "ZDEV_MCP_SERVER": "zdev_upstream",
                 "AIOS_REFRESH_SCRIPT": str(self.refresh),
+                "AIOS_LOCAL_SEARCH_SCRIPT": str(self.search),
                 "AIOS_MIRROR_ROOT": str(self.mirrors),
                 "AIOS_REPOSITORY_MAP": str(self.repository_map),
+                "AIOS_VERSION_SETS_FILE": str(self.version_sets),
+                "AIOS_DEFAULT_VERSION": "5.5.30",
                 "AIOS_ZDEV_MODE": mode,
             }
         )
@@ -107,7 +117,7 @@ for line in sys.stdin:
             response = self.request(process, {"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}})
             tools = response["result"]["tools"]
             self.assertEqual(
-                ["aios_refresh_code_mirrors", "confluence_search", "jira_search"],
+                ["aios_refresh_code_mirrors", "aios_search_local_code", "confluence_search", "jira_search"],
                 sorted(tool["name"] for tool in tools),
             )
             for tool in tools:
@@ -138,7 +148,7 @@ for line in sys.stdin:
         process = self.start_proxy("local")
         try:
             response = self.request(process, {"jsonrpc": "2.0", "id": 6, "method": "tools/list", "params": {}})
-            self.assertEqual([], response["result"]["tools"])
+            self.assertEqual(["aios_search_local_code"], [tool["name"] for tool in response["result"]["tools"]])
         finally:
             self.stop_proxy(process)
 
@@ -190,6 +200,25 @@ for line in sys.stdin:
             )
             self.assertFalse(response["result"]["isError"])
             self.assertIn('"status":"updated"', response["result"]["content"][0]["text"])
+        finally:
+            self.stop_proxy(process)
+
+    def test_searches_only_local_versioned_code(self) -> None:
+        process = self.start_proxy()
+        try:
+            response = self.request(
+                process,
+                {
+                    "jsonrpc": "2.0",
+                    "id": 7,
+                    "method": "tools/call",
+                    "params": {"name": "aios_search_local_code", "arguments": {"terms": ["dGPU"]}},
+                },
+            )
+            self.assertFalse(response["result"]["isError"])
+            payload = json.loads(response["result"]["content"][0]["text"])
+            self.assertEqual("5.5.30", payload["version"])
+            self.assertEqual("ai.py", payload["matches"][0]["path"])
         finally:
             self.stop_proxy(process)
 

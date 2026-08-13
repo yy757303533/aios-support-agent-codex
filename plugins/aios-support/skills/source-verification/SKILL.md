@@ -5,7 +5,7 @@ description: 对 AIOS 五个本地 bare mirror 进行只读、commit 绑定的�
 
 # AIOS 源码查证
 
-源码查证前必须获得 `aios-version-resolver` 生成的 CodeContext。不得直接使用工作目录当前分支。
+源码查证必须优先调用运行时 `aios_search_local_code`。该工具按正式版本清单解析五仓固定 commit，不得直接使用工作目录当前分支，也不得要求提问者提供开发机路径。
 
 ## 仓库路由
 
@@ -21,7 +21,9 @@ AI 目录范围使用 Git pathspec `:(glob,icase)**/ai*/**` 动态匹配，不�
 
 ## 查询
 
-将 resolver 输出保存为只读 CodeContext 文件，再使用 `scripts/query_code.py`；查询脚本从上下文读取 commit，不接受调用者另传主 commit：
+机器人运行时从问题中提取 1-8 个短代码标识、错误片段或配置键，调用 `aios_search_local_code`。用户未提供版本时使用批准的最新版本；用户提供版本时必须使用该版本，不得回退。
+
+维护或离线调试时，可将 resolver 输出保存为只读 CodeContext 文件，再使用 `scripts/query_code.py`；查询脚本从上下文读取 commit，不接受调用者另传主 commit：
 
 ```bash
 python3 scripts/query_code.py \

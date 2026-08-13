@@ -46,23 +46,31 @@ def configure_mcp(
     config_path: Path,
     proxy_path: Path,
     refresh_script: Path,
+    search_script: Path,
     mirror_root: Path,
     repository_map: Path,
+    version_sets: Path,
 ) -> None:
     config_path = config_path.resolve()
     proxy_path = proxy_path.resolve()
     refresh_script = refresh_script.resolve()
+    search_script = search_script.resolve()
     mirror_root = mirror_root.resolve()
     repository_map = repository_map.resolve()
+    version_sets = version_sets.resolve()
     if (
         not proxy_path.is_file()
         or proxy_path.is_symlink()
         or not refresh_script.is_file()
         or refresh_script.is_symlink()
+        or not search_script.is_file()
+        or search_script.is_symlink()
         or not mirror_root.is_dir()
         or mirror_root.is_symlink()
         or not repository_map.is_file()
         or repository_map.is_symlink()
+        or not version_sets.is_file()
+        or version_sets.is_symlink()
     ):
         raise ConfigError("proxy_invalid")
     payload = load_config(config_path)
@@ -85,8 +93,10 @@ def configure_mcp(
             "ZDEV_MCP_CONFIG": str(config_path),
             "ZDEV_MCP_SERVER": "zdev_upstream",
             "AIOS_REFRESH_SCRIPT": str(refresh_script),
+            "AIOS_LOCAL_SEARCH_SCRIPT": str(search_script),
             "AIOS_MIRROR_ROOT": str(mirror_root),
             "AIOS_REPOSITORY_MAP": str(repository_map),
+            "AIOS_VERSION_SETS_FILE": str(version_sets),
         },
         "enabled": True,
         "default_tools_approval_mode": "never",
@@ -101,11 +111,21 @@ def main() -> int:
     mcp.add_argument("--config", type=Path, required=True)
     mcp.add_argument("--proxy", type=Path, required=True)
     mcp.add_argument("--refresh-script", type=Path, required=True)
+    mcp.add_argument("--search-script", type=Path, required=True)
     mcp.add_argument("--mirror-root", type=Path, required=True)
     mcp.add_argument("--repository-map", type=Path, required=True)
+    mcp.add_argument("--version-sets", type=Path, required=True)
     args = parser.parse_args()
     try:
-        configure_mcp(args.config, args.proxy, args.refresh_script, args.mirror_root, args.repository_map)
+        configure_mcp(
+            args.config,
+            args.proxy,
+            args.refresh_script,
+            args.search_script,
+            args.mirror_root,
+            args.repository_map,
+            args.version_sets,
+        )
     except (ConfigError, OSError):
         print('{"status":"failed"}')
         return 2

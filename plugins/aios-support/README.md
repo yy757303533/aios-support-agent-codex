@@ -33,7 +33,7 @@ TAVILY_HIKARI_TOKEN
 
 机器人必须通过 `scripts/robot_gateway.py` 作为唯一 Agent 命令运行。网关从 root-only 策略文件读取固定的 `internal` 受众，输入先脱敏，并用只读 sandbox 运行 Codex。内部群问答直接返回纯文本或 Markdown；模型调用失败时明确返回运行错误，不使用安全降级文案。不得把 DWS 直接连接到裸 `codex` 渠道。
 
-workspace 的 `zdev` 必须由 `scripts/configure_runtime.py mcp` 改造成禁用的 `zdev_upstream` 与启用的 `zdev_readonly`。只读代理只暴露 Jira 和 Confluence 查询工具，不暴露任何 GitLab 代码读取或搜索工具；源码始终查询开发机本地五仓或 bare mirror。评论、修改 Issue、提交和 push 均不可见且伪造调用会被拒绝。`aios_refresh_code_mirrors` 是唯一批准的本地写操作，只能对 `config/repository-map.json` 中登记的 bare mirror 执行 `git fetch --prune origin`，不 checkout、不 commit、不 push，并且不得配置定时执行。
+workspace 的 `zdev` 必须由 `scripts/configure_runtime.py mcp` 改造成禁用的 `zdev_upstream` 与启用的 `zdev_readonly`。只读代理暴露 Jira/Confluence 查询和版本绑定的 `aios_search_local_code`，不暴露任何 GitLab 代码读取或搜索工具；源码始终查询开发机本地五仓 bare mirror。评论、修改 Issue、提交和 push 均不可见且伪造调用会被拒绝。`aios_refresh_code_mirrors` 是唯一批准的本地写操作，只能对 `config/repository-map.json` 中登记的 bare mirror 执行 `git fetch --prune origin`，不 checkout、不 commit、不 push，并且不得配置定时执行。
 
 售后日志先通过内置日志与代码地图定位 MN、Host、VM、Container、Model Center 或 Storage 层，再在目标版本 CodeContext 中反查错误生成点、logger 调用点和直接调用方。源码无命中或日志来源不明时保留 `unknown`，不得猜测归属。
 
