@@ -37,6 +37,8 @@ workspace 的 `zdev` 必须由 `scripts/configure_runtime.py mcp` 改造成禁�
 
 售后日志先通过内置日志与代码地图定位 MN、Host、VM、Container、Model Center 或 Storage 层，再在目标版本 CodeContext 中反查错误生成点、logger 调用点和直接调用方。源码无命中或日志来源不明时保留 `unknown`，不得猜测归属。
 
+问题明确包含 `AIOS x.y.z` 时使用该版本的冻结五仓快照；未提供 AIOS 版本时使用网关策略中的 `default_version`，当前为 `5.5.30`。日志中出现的 GuestTools 或组件版本不能覆盖 AIOS 版本。指定版本没有快照时必须提示先同步并冻结，不得静默回退到最新版本。
+
 钉钉知识使用人工双阶段发布：`scripts/sync_knowledge.py prepare` 生成已脱敏的 `pending_review` 候选，审核后用 `publish --confirm-reviewed` 发布不可变 release 并原子切换 `current`。禁止定时同步，禁止提交知识正文到 Git，禁止从未审核候选回答。
 
 ```bash

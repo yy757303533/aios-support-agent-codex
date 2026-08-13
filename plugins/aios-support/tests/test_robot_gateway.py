@@ -36,6 +36,11 @@ sys.exit(int(os.environ.get('FAKE_CODEX_EXIT', '0')))
         self.policy = self.root / "policy.json"
         self.args_file = self.root / "args"
         self.mode_file = self.root / "mode"
+        self.version_sets = self.root / "version-sets.json"
+        self.version_sets.write_text(
+            json.dumps({"version_sets": {"5.5.28": {}, "5.5.30": {}}}),
+            encoding="utf-8",
+        )
         self.policy.write_text(
             json.dumps(
                 {
@@ -45,6 +50,7 @@ sys.exit(int(os.environ.get('FAKE_CODEX_EXIT', '0')))
                     "workspace": str(PLUGIN_ROOT),
                     "model": "test-model",
                     "timeout_seconds": 30,
+                    "default_version": "5.5.30",
                 }
             ),
             encoding="utf-8",
@@ -59,6 +65,7 @@ sys.exit(int(os.environ.get('FAKE_CODEX_EXIT', '0')))
             {
                 "AIOS_GATEWAY_POLICY": str(self.policy),
                 "AIOS_CODEX_BIN": str(self.fake_codex),
+                "AIOS_VERSION_SETS_FILE": str(self.version_sets),
                 "FAKE_CODEX_MARKER": str(self.marker),
                 "FAKE_CODEX_ARGS": str(self.args_file),
                 "FAKE_CODEX_MODE": str(self.mode_file),
@@ -109,11 +116,11 @@ sys.exit(int(os.environ.get('FAKE_CODEX_EXIT', '0')))
         self.assertEqual(0, result.returncode)
         self.assertEqual("直接回答，不要求 JSON。\n", result.stdout)
 
-    def test_local_support_question_disables_remote_connectors(self) -> None:
+    def test_local_support_question_keeps_support_only_mode(self) -> None:
         result = self.run_gateway("AIOS 5.5.30 的 dGPU 为什么未初始化？", "本地结论")
 
         self.assertEqual(0, result.returncode)
-        self.assertEqual("local", self.mode_file.read_text(encoding="utf-8"))
+        self.assertEqual("support", self.mode_file.read_text(encoding="utf-8"))
 
     def test_explicit_jira_question_keeps_zdev_available(self) -> None:
         result = self.run_gateway("请查询 Jira AIOS-123", "Jira 结论")
@@ -125,13 +132,26 @@ sys.exit(int(os.environ.get('FAKE_CODEX_EXIT', '0')))
         result = self.run_gateway("去 GitLab 搜索这段代码", "本地代码结论")
 
         self.assertEqual(0, result.returncode)
-        self.assertEqual("local", self.mode_file.read_text(encoding="utf-8"))
+        self.assertEqual("support", self.mode_file.read_text(encoding="utf-8"))
 
     def test_explicit_code_sync_request_enables_controlled_refresh_tool(self) -> None:
         result = self.run_gateway("请同步本地五仓代码", "已更新")
 
         self.assertEqual(0, result.returncode)
         self.assertEqual("sync", self.mode_file.read_text(encoding="utf-8"))
+
+    def test_missing_aios_version_uses_latest_snapshot(self) -> None:
+        result = self.run_gateway("dGPU 为什么未初始化？GuestTools 是 5.5.0", "使用最新版本")
+
+        self.assertEqual(0, result.returncode)
+        self.assertTrue(self.marker.exists())
+
+    def test_unknown_explicit_aios_version_does_not_fallback(self) -> None:
+        result = self.run_gateway("AIOS 5.5.29 的行为是什么？", "不应调用")
+
+        self.assertEqual(0, result.returncode)
+        self.assertFalse(self.marker.exists())
+        self.assertEqual("未配置 AIOS 5.5.29 的本地五仓快照，请先同步并冻结该版本。\n", result.stdout)
 
 
 if __name__ == "__main__":
