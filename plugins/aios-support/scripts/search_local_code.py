@@ -108,7 +108,15 @@ def search(
         scopes = search_scopes(repository, terms)
         scanned.append({"repository": repository, "commit": entry["commit"], "scopes": scopes or ["<entire-repository>"]})
         repository_matches: list[dict[str, str | int]] = []
-        for line in git_grep(mirror, entry["commit"], terms, scopes):
+        candidate_lines: list[str] = []
+        seen_lines: set[str] = set()
+        for term in terms:
+            term_matches = git_grep(mirror, entry["commit"], [term], scopes)
+            for line in term_matches[:2]:
+                if line not in seen_lines:
+                    candidate_lines.append(line)
+                    seen_lines.add(line)
+        for line in candidate_lines:
             revision_prefix = f"{entry['commit']}:"
             if line.startswith(revision_prefix):
                 line = line[len(revision_prefix):]

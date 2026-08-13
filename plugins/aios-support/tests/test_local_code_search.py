@@ -92,6 +92,20 @@ class LocalCodeSearchTest(unittest.TestCase):
         self.assertFalse(relevant_path("packages/app/public/i18n/zh-CN.json"))
         self.assertTrue(relevant_path("packages/app/ai-store/gpu.ts"))
 
+    def test_samples_each_search_term_instead_of_only_first_sorted_matches(self) -> None:
+        result = search(
+            self.mirrors,
+            self.repository_map,
+            self.version_sets,
+            "5.5.30",
+            ["dGPU", "GuestTools"],
+            ["aios"],
+            4,
+        )
+        texts = [match["text"] for match in result["matches"]]
+        self.assertTrue(any("dGPU" in text for text in texts))
+        self.assertTrue(any("GuestTools" in text for text in texts))
+
 
 if __name__ == "__main__":
     unittest.main()
