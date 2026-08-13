@@ -17,7 +17,7 @@ description: 只读检查 AIOS Support 插件的 bare mirrors、版本配置、B
 
 ## 连接器层
 
-对 BBS、Atlassian 和 Tavily 分别报告：未配置、已配置但工具未注入、工具可见、结构化查询成功或查询未完成。只调用批准的只读工具。
+对 BBS、Atlassian 和 Tavily 分别报告：显式禁用、未配置、已配置但工具未注入、工具可见、结构化查询成功或查询未完成。只调用批准的只读工具。`enabled=false` 是不可用连接器的安全降级，不是配置校验失败。
 
 连接器检查前先运行 `validate_mcp_config.py`。当前会话暴露任何非白名单工具时停止烟测并报告安全校验失败；不得为了完成烟测调用 BBS 发帖或其他写工具。
 

@@ -132,8 +132,8 @@ def validate(config: dict[str, Any]) -> list[str]:
             errors.append(f"{name}:transport_invalid")
         if server.get("url") != expected["url"]:
             errors.append(f"{name}:url_mismatch")
-        if server.get("enabled") is not True:
-            errors.append(f"{name}:not_enabled")
+        if not isinstance(server.get("enabled"), bool):
+            errors.append(f"{name}:enabled_invalid")
         if server.get("default_tools_approval_mode") != "writes":
             errors.append(f"{name}:approval_mode_invalid")
 

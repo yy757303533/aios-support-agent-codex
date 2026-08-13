@@ -42,6 +42,17 @@ class McpPolicyTest(unittest.TestCase):
         self.assertIn("mcp_server_set_mismatch", errors)
         self.assertIn("tavily_hikari:url_mismatch", errors)
 
+    def test_accepts_explicitly_disabled_unavailable_connectors(self) -> None:
+        config = copy.deepcopy(self.config)
+        config["mcpServers"]["zstack-bbs-support"]["enabled"] = False
+        config["mcpServers"]["zstack_atlassian_shared"]["enabled"] = False
+        self.assertEqual([], validate_mcp(config))
+
+    def test_rejects_non_boolean_enabled_value(self) -> None:
+        config = copy.deepcopy(self.config)
+        config["mcpServers"]["zstack-bbs-support"]["enabled"] = "false"
+        self.assertIn("zstack-bbs-support:enabled_invalid", validate_mcp(config))
+
     def test_rejects_hostile_config_types_without_crashing(self) -> None:
         self.assertEqual(["mcp_config_shape_invalid"], validate_mcp([]))
         config = copy.deepcopy(self.config)
