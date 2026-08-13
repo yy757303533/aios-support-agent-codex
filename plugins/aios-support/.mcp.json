@@ -9,7 +9,7 @@
       "env_http_headers": {
         "Authorization": "ZSTACK_BBS_AUTHORIZATION"
       },
-      "enabled": true,
+      "enabled": false,
       "default_tools_approval_mode": "writes",
       "enabled_tools": [
         "bbs_search",

@@ -6,6 +6,7 @@
 - 认证：`ZSTACK_BBS_AUTHORIZATION`
 - 权限：搜索和读取
 - 禁止：`bbs_create_thread`
+- 当前状态：默认禁用；现有 HTTP 端点无法从 Codex 稳定建连，避免每次问答启动时重试。需要 BBS 资料时，修复连接后再人工启用。
 
 ## Jira / Confluence
 
