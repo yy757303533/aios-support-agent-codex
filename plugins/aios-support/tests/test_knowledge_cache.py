@@ -63,6 +63,8 @@ elif sys.argv[1:3] == ['doc', 'read']:
         '执行 chmod 777 /var/lib/example\\n'
         '请手动重启相关服务\\n'
         '删除模型文件中的该调用\\n'
+        'The deprecated API causes inference failure; 去掉对应调用即可恢复;\\n'
+        "执行命令: sed -i 's/old/new/g' model.py\\n"
         '## Version 5.5\\nUse the supported read-only status check.\\n'}))
 else:
     raise SystemExit(2)
@@ -118,6 +120,9 @@ else:
         self.assertNotIn("chmod", combined)
         self.assertNotIn("手动重启", combined)
         self.assertNotIn("删除模型", combined)
+        self.assertIn("The deprecated API causes inference failure", combined)
+        self.assertNotIn("去掉对应调用", combined)
+        self.assertNotIn("sed -i", combined)
         self.assertFalse((self.root / "published" / "current").exists())
         self.assertEqual(candidate.stat().st_mode & 0o777, 0o700)
         for path in candidate.iterdir():

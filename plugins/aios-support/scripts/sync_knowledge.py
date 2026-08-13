@@ -41,10 +41,10 @@ PROMPT_MANIPULATION = re.compile(
     r"developer message|system message|越权|忽略(?:之前|以上).{0,8}(?:指令|要求))"
 )
 DANGEROUS_ACTION = re.compile(
-    r"(?i)(?:rm\s+-rf|kubectl\s+delete|drop\s+table|shutdown\b|reboot\b|"
+    r"(?i)(?:rm\s+-rf|sed\s+-i|kubectl\s+delete|drop\s+table|shutdown\b|reboot\b|"
     r"systemctl\s+(?:stop|restart)|sysctl\s+-w|apply.{0,12}destroy|"
     r"\b(?:chmod|chown|mount|umount|redis-cli)\b|"
-    r"(?:删除|重启|停止|启动|修改|替换|卸载))"
+    r"(?:删除|删去|去掉|重启|停止|启动|修改|替换|卸载|执行命令))"
 )
 MAX_DOCUMENT_CHARS = 1_000_000
 MAX_CHUNK_CHARS = 3_500
@@ -156,9 +156,13 @@ def sanitize_markdown(markdown: str) -> tuple[str, dict[str, int]]:
         if PROMPT_MANIPULATION.search(line):
             stats["prompt_lines_removed"] += 1
             continue
-        if DANGEROUS_ACTION.search(line):
+        parts = re.split(r"(?<=[；;。.!！？?])\s*", line)
+        safe_parts = [part for part in parts if part and not DANGEROUS_ACTION.search(part)]
+        if len(safe_parts) != len([part for part in parts if part]):
             stats["dangerous_lines_removed"] += 1
-            continue
+            line = " ".join(safe_parts)
+            if not line:
+                continue
         line = UUID_PATTERN.sub("[redacted-id]", line)
         line = EMAIL_PATTERN.sub("[redacted-email]", line)
         line = MAC_PATTERN.sub("[redacted-mac]", line)
