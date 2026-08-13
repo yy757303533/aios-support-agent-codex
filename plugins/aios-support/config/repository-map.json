@@ -1,0 +1,25 @@
+{
+  "repositories": {
+    "aios": {
+      "mirror": "aios.git",
+      "default_ref": "master",
+      "branch_policy": "fixed"
+    },
+    "zstack": {
+      "mirror": "zstack.git",
+      "branch_policy": "versioned"
+    },
+    "premium": {
+      "mirror": "premium.git",
+      "branch_policy": "versioned"
+    },
+    "zstack-utility": {
+      "mirror": "zstack-utility.git",
+      "branch_policy": "versioned"
+    },
+    "zstack-ui-next": {
+      "mirror": "zstack-ui-next.git",
+      "branch_policy": "versioned"
+    }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "version_sets": {
+    "latest": {
+      "type": "moving",
+      "description": "当前 AIOS 开发代码，不代表正式发布能力。",
+      "repositories": {
+        "aios": { "ref": "master" },
+        "zstack": { "ref": "master" },
+        "premium": { "ref": "master" },
+        "zstack-utility": { "ref": "master" },
+        "zstack-ui-next": { "ref": "main" }
+      }
+    },
+    "5.5.28": {
+      "type": "release",
+      "description": "示例正式版本；使用前必须补齐并冻结真实 commit。",
+      "repositories": {
+        "aios": { "ref": "master", "commit": null },
+        "zstack": { "ref": "feature-5.5.28-aios", "commit": null },
+        "premium": { "ref": "feature-5.5.28-aios", "commit": null },
+        "zstack-utility": { "ref": "feature-5.5.28-aios", "commit": null },
+        "zstack-ui-next": { "ref": "feature-5.5.28-aios", "commit": null }
+      }
+    }
+  }
+}

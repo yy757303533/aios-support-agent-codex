@@ -1,0 +1,75 @@
+{
+  "mcpServers": {
+    "zstack-bbs-support": {
+      "type": "streamable_http",
+      "url": "http://172.18.250.27:8768/mcp",
+      "http_headers": {
+        "Accept": "application/json, text/event-stream"
+      },
+      "env_http_headers": {
+        "Authorization": "ZSTACK_BBS_AUTHORIZATION"
+      },
+      "enabled": true,
+      "default_tools_approval_mode": "writes",
+      "enabled_tools": [
+        "bbs_search",
+        "bbs_get_thread",
+        "bbs_latest",
+        "bbs_get_forum"
+      ],
+      "disabled_tools": [
+        "bbs_create_thread"
+      ]
+    },
+    "zstack_atlassian_shared": {
+      "type": "streamable_http",
+      "url": "http://172.18.250.27:3340/mcp",
+      "http_headers": {
+        "Accept": "application/json, text/event-stream"
+      },
+      "env_http_headers": {
+        "Authorization": "ATLASSIAN_AUTHORIZATION"
+      },
+      "enabled": true,
+      "default_tools_approval_mode": "writes",
+      "enabled_tools": [
+        "jira_search",
+        "jira_get_issue",
+        "jira_get_project_versions",
+        "jira_search_fields",
+        "confluence_search",
+        "confluence_get_page",
+        "confluence_get_page_children",
+        "confluence_get_space_page_tree"
+      ],
+      "disabled_tools": [
+        "confluence_add_comment",
+        "confluence_create_page",
+        "confluence_delete_page",
+        "confluence_update_page",
+        "confluence_upload_attachment",
+        "jira_add_comment",
+        "jira_create_issue",
+        "jira_delete_issue",
+        "jira_transition_issue",
+        "jira_update_issue"
+      ]
+    },
+    "tavily_hikari": {
+      "type": "streamable_http",
+      "url": "https://tavily.zopen1.com/mcp",
+      "bearer_token_env_var": "TAVILY_HIKARI_TOKEN",
+      "enabled": true,
+      "default_tools_approval_mode": "writes",
+      "enabled_tools": [
+        "tavily_search"
+      ],
+      "disabled_tools": [
+        "tavily_crawl",
+        "tavily_extract",
+        "tavily_map",
+        "tavily_research"
+      ]
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "aios-support-marketplace",
+  "interface": {
+    "displayName": "Aios Support Marketplace"
+  },
+  "plugins": [
+    {
+      "name": "aios-support",
+      "source": {
+        "source": "local",
+        "path": "./plugins/aios-support"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Engineering"
+    }
+  ]
+}

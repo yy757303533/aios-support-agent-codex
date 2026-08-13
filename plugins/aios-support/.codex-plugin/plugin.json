@@ -1,0 +1,39 @@
+{
+  "name": "aios-support",
+  "version": "0.1.0",
+  "description": "Read-only, version-aware AIOS support analysis for Codex.",
+  "author": {
+    "name": "AIOS Support Team",
+    "url": "https://github.com/yy757303533"
+  },
+  "homepage": "https://github.com/yy757303533/aios-support-agent-codex",
+  "repository": "https://github.com/yy757303533/aios-support-agent-codex",
+  "keywords": [
+    "aios",
+    "zstack",
+    "support",
+    "troubleshooting",
+    "version-aware"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "AIOS Support Agent",
+    "shortDescription": "AIOS 多版本问答、源码查证与故障分析。",
+    "longDescription": "面向 AIOS 销售与技术支持场景的只读 Codex 插件。按产品版本解析 aios、zstack、premium、zstack-utility、zstack-ui-next 的不可变代码上下文，结合钉钉知识库、BBS、Jira、Confluence 和公开资料进行证据优先查证。",
+    "developerName": "AIOS Support Team",
+    "category": "Engineering",
+    "capabilities": [
+      "Skills",
+      "MCP",
+      "Read",
+      "Analysis"
+    ],
+    "defaultPrompt": [
+      "@aios-support-qa 5.5.28 支持哪些推理框架？",
+      "@aios-source-verification 查询模型服务入口的前后端实现",
+      "@aios-event-analysis 分析这段已脱敏的推理服务错误"
+    ],
+    "brandColor": "#2563EB"
+  }
+}
