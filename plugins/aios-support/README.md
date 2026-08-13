@@ -10,6 +10,7 @@
 | `aios-knowledge-verification` | 钉钉 AIOS 知识库查证 |
 | `aios-event-analysis` | 多来源故障分析 |
 | `aios-connectivity-check` | 安装和数据源验收 |
+| `aios-redaction-review` | internal/sales/customer 发送前脱敏门禁 |
 
 ## 必要环境变量
 
@@ -28,6 +29,12 @@ TAVILY_HIKARI_TOKEN
 
 不要将任何变量值写入仓库、聊天、截图或工单。
 
+所有连接器查询文本先通过 `scripts/sanitize_query.py`，所有机器人答案在发送前通过 `scripts/validate_answer.py`。插件安装测试会执行严格 MCP 策略和秘密扫描。
+
+## 发布状态
+
+当前仓库是本地开发/验证插件，不是可直接上线的钉钉生产网关。CLI 门禁属于纵深防御，不能替代服务端身份和发送出口。生产机器人必须先完成服务端受众/RBAC 绑定、钉钉回调验签和防重放、唯一 fail-closed 发送适配器、TLS 或 mTLS 内部连接器、运行时 `tools/list` 校验、限流和审计；任一项缺失即禁止接入真实客户材料或自动发送答案。
+
 ## 创建 bare mirror
 
 ```bash
@@ -39,7 +46,7 @@ git clone --mirror <zstack-utility-url> "$AIOS_CODE_MIRROR_ROOT/zstack-utility.g
 git clone --mirror <zstack-ui-next-url> "$AIOS_CODE_MIRROR_ROOT/zstack-ui-next.git"
 ```
 
-定时更新使用 `git --git-dir=<mirror> fetch --prune`。问答期间不执行 fetch，保证本次 CodeContext 不移动。
+定时更新使用 `git --git-dir=<mirror> fetch --prune`。问答期间不执行 fetch，保证本次 CodeContext 不移动。源码查询必须使用 resolver 生成的完整 CodeContext 文件，不能直接指定任意 commit。
 
 ## 版本配置
 

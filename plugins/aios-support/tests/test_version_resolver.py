@@ -105,6 +105,39 @@ class VersionResolverTest(unittest.TestCase):
 
         self.assertIn("5.5.28/zstack: release commit must be pinned", errors)
 
+    def test_release_commit_must_match_declared_ref(self) -> None:
+        version_set = {
+            "type": "release",
+            "repositories": {
+                "aios": {"ref": "missing-release-ref", "commit": self.aios_commit},
+                "zstack": {"ref": "feature-5.5.28-aios", "commit": self.zstack_commit},
+            },
+        }
+        context = resolve_context(self.repository_map, version_set, self.mirror_root, "5.5.28")
+
+        self.assertFalse(context["complete"])
+        self.assertEqual("commit_ref_mismatch", context["repositories"]["aios"]["status"])
+
+    def test_release_commit_remains_valid_when_branch_advances(self) -> None:
+        working = self.root / "zstack-working"
+        (working / "later.txt").write_text("later\n", encoding="utf-8")
+        run("git", "add", "later.txt", cwd=working)
+        run("git", "commit", "-m", "later", cwd=working)
+        mirror = self.mirror_root / "zstack.git"
+        run("git", "fetch", str(working), "feature-5.5.28-aios:feature-5.5.28-aios", cwd=mirror)
+        version_set = {
+            "type": "release",
+            "repositories": {
+                "aios": {"ref": "master", "commit": self.aios_commit},
+                "zstack": {"ref": "feature-5.5.28-aios", "commit": self.zstack_commit},
+            },
+        }
+
+        context = resolve_context(self.repository_map, version_set, self.mirror_root, "5.5.28")
+
+        self.assertTrue(context["complete"])
+        self.assertEqual(self.zstack_commit, context["repositories"]["zstack"]["commit"])
+
 
 if __name__ == "__main__":
     unittest.main()

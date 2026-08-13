@@ -6,4 +6,15 @@ __pycache__/
 !.env.example
 outputs/
 .aios-support-data/
-
+*.docx
+*.pdf
+*.xlsx
+*.xls
+*.csv
+*.har
+*.pcap
+*.dump
+*.zip
+*.rar
+*.pem
+*.key

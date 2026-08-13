@@ -15,7 +15,13 @@ done < <(find "$plugin_root/skills" -mindepth 1 -maxdepth 1 -type d | sort)
 python3 -m unittest discover -s "$plugin_root/tests" -p 'test_*.py' -v
 
 python3 -m json.tool "$repo_root/.agents/plugins/marketplace.json" >/dev/null
-python3 -m json.tool "$plugin_root/.mcp.json" >/dev/null
+python3 "$plugin_root/scripts/validate_mcp_config.py" "$plugin_root/.mcp.json"
+if [[ -n "${AIOS_VERSION_SETS_FILE:-}" ]]; then
+  python3 "$plugin_root/scripts/validate_version_sets.py" \
+    --repository-map "$plugin_root/config/repository-map.json" \
+    --version-sets "$AIOS_VERSION_SETS_FILE"
+fi
+python3 "$plugin_root/scripts/security_scan.py" "$repo_root"
 python3 -m json.tool "$plugin_root/config/repository-map.json" >/dev/null
 
 echo "AIOS Support plugin validation passed."

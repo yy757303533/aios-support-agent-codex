@@ -48,5 +48,5 @@ python3 scripts/resolve_code_context.py \
 ## 结果使用
 
 - `complete=true`：可以进行完整代码查证。
-- `complete=false`：可以查询已解析仓库，但结论必须列出 `missing` 并降低可信度。
+- `complete=false`：禁止源码查询；只报告 `missing`、返回降级状态并请求补齐映射或镜像。
 - 本次问答始终使用返回的 commit；不得在问答中再次解析移动分支。

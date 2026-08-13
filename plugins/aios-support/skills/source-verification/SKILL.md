@@ -17,16 +17,19 @@ description: 对 AIOS 五个本地 bare mirror 进行只读、commit 绑定的�
 
 ## 查询
 
-使用 `scripts/query_code.py`，只传 CodeContext 中已解析的 commit：
+将 resolver 输出保存为只读 CodeContext 文件，再使用 `scripts/query_code.py`；查询脚本从上下文读取 commit，不接受调用者另传主 commit：
 
 ```bash
 python3 scripts/query_code.py \
   --mirror-root "$AIOS_CODE_MIRROR_ROOT" \
   --repository-map config/repository-map.json \
   --repository zstack \
-  --commit <resolved-commit> \
+  --context-file <resolved-context.json> \
+  --version-sets "$AIOS_VERSION_SETS_FILE" \
   grep --pattern ModelService
 ```
+
+正式发布上下文必须传 `--version-sets`，查询脚本会复核五仓库集合以及每个 ref/commit 与受控版本映射完全一致。开发分支上下文会复核当前未更新 mirror 的 ref tip；问答期间不得 fetch。
 
 支持 `grep`、`show`、`log`、`diff`。命令通过参数数组调用 Git，不接受 shell 片段。
 

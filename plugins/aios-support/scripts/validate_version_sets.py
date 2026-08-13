@@ -10,20 +10,33 @@ from pathlib import Path
 
 def validate(repository_map: dict, version_sets: dict) -> list[str]:
     errors: list[str] = []
-    repository_names = set(repository_map.get("repositories", {}))
+    if not isinstance(repository_map, dict) or not isinstance(repository_map.get("repositories"), dict):
+        return ["repository map must contain repositories object"]
+    if not isinstance(version_sets, dict) or not isinstance(version_sets.get("version_sets"), dict):
+        return ["version sets must contain version_sets object"]
+    repository_names = set(repository_map["repositories"])
     if not repository_names:
         return ["repository map has no repositories"]
 
     for version, settings in version_sets.get("version_sets", {}).items():
+        if not isinstance(version, str) or not isinstance(settings, dict):
+            errors.append("version entry must be an object with a string key")
+            continue
         context_type = settings.get("type")
         if context_type not in {"release", "moving"}:
             errors.append(f"{version}: type must be release or moving")
         repositories = settings.get("repositories", {})
+        if not isinstance(repositories, dict):
+            errors.append(f"{version}: repositories must be an object")
+            continue
         for missing in sorted(repository_names - set(repositories)):
             errors.append(f"{version}: missing repository {missing}")
         for extra in sorted(set(repositories) - repository_names):
             errors.append(f"{version}: unknown repository {extra}")
         for name, repository in repositories.items():
+            if not isinstance(name, str) or not isinstance(repository, dict):
+                errors.append(f"{version}: repository entry must be an object with a string key")
+                continue
             if not repository.get("ref"):
                 errors.append(f"{version}/{name}: ref is required")
             if context_type == "release" and not repository.get("commit"):
