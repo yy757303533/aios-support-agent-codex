@@ -90,15 +90,15 @@ def search(
     matches: list[dict[str, str | int]] = []
     scanned: list[dict[str, object]] = []
     truncated = False
+    repository_limit = max(1, limit // len(selected))
+    overflow: list[dict[str, str | int]] = []
     for repository in selected:
         entry = context["repositories"][repository]
         mirror = repository_mirror(mirror_root, entry["mirror"])
         scopes = search_scopes(repository, terms)
         scanned.append({"repository": repository, "commit": entry["commit"], "scopes": scopes or ["<entire-repository>"]})
+        repository_matches: list[dict[str, str | int]] = []
         for line in git_grep(mirror, entry["commit"], terms, scopes):
-            if len(matches) >= limit:
-                truncated = True
-                break
             revision_prefix = f"{entry['commit']}:"
             if line.startswith(revision_prefix):
                 line = line[len(revision_prefix):]
@@ -106,9 +106,16 @@ def search(
             line_number, separator2, text = remainder.partition(":")
             if not separator or not separator2 or not line_number.isdigit():
                 continue
-            matches.append({"repository": repository, "path": path, "line": int(line_number), "text": text[:500]})
-        if truncated:
-            break
+            repository_matches.append(
+                {"repository": repository, "path": path, "line": int(line_number), "text": text[:500]}
+            )
+        matches.extend(repository_matches[:repository_limit])
+        overflow.extend(repository_matches[repository_limit:])
+        truncated = truncated or len(repository_matches) > repository_limit
+    remaining = limit - len(matches)
+    if remaining > 0:
+        matches.extend(overflow[:remaining])
+        truncated = truncated or len(overflow) > remaining
     return {
         "version": version,
         "complete": True,

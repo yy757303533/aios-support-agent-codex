@@ -73,6 +73,18 @@ class LocalCodeSearchTest(unittest.TestCase):
         self.assertIn(":(glob,icase)**/*gpu*/**", scopes)
         self.assertIn(":(glob,icase)**/*guesttool*/**", scopes)
 
+    def test_busy_first_repository_does_not_starve_later_repositories(self) -> None:
+        result = search(
+            self.mirrors,
+            self.repository_map,
+            self.version_sets,
+            "5.5.30",
+            ["dGPU"],
+            None,
+            2,
+        )
+        self.assertEqual(["aios", "premium"], [match["repository"] for match in result["matches"]])
+
 
 if __name__ == "__main__":
     unittest.main()
