@@ -153,6 +153,15 @@ sys.exit(int(os.environ.get('FAKE_CODEX_EXIT', '0')))
         self.assertFalse(self.marker.exists())
         self.assertEqual("未配置 AIOS 5.5.29 的本地五仓快照，请先同步并冻结该版本。\n", result.stdout)
 
+    def test_source_lookup_uses_workspace_but_normal_question_does_not(self) -> None:
+        self.run_gateway("请查源码调用链", "源码结论")
+        source_arguments = self.args_file.read_text(encoding="utf-8")
+        self.assertIn(str(PLUGIN_ROOT), source_arguments)
+
+        self.run_gateway("dGPU 为什么未初始化", "知识结论")
+        knowledge_arguments = self.args_file.read_text(encoding="utf-8")
+        self.assertNotIn(str(PLUGIN_ROOT), knowledge_arguments)
+
 
 if __name__ == "__main__":
     unittest.main()
