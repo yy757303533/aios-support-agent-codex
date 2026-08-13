@@ -11,9 +11,9 @@ description: 对 AIOS 五个本地 bare mirror 进行只读、commit 绑定的�
 
 - `aios`：整个仓库都属于 AIOS 查询范围。
 - `zstack`：只查询由 AIOS API、消息、资源类型或已命中调用方定位到的代码。
-- `premium`：只查询 AI 模块、GuestTools 及其直接调用方。
+- `premium`：AIOS 是项目组名称，代码目录通常使用 `ai`；优先查询 `plugin-premium/ai`、AI service/spring 配置、GuestTools 及其直接调用方。
 - `zstack-utility`：只查询 GPU、GuestTools、Host Agent 中与 AIOS 直接相关的代码。
-- `zstack-ui-next`：只查询 AI Store、模型、推理服务、GPU 等 AIOS 页面和请求代码。
+- `zstack-ui-next`：优先查询 `packages/products/cloud/apps/ai-store`，以及模型、推理服务、GPU 等直接关联页面和请求代码。
 
 禁止无条件扫描后四个仓库。先按问题定位仓库和模块，再用错误文本、类名、API 或配置键执行带路径的 `git grep`；只有命中代码的直接调用链跨模块时才能扩大一次范围。不得遍历构建产物、依赖、缓存、测试报告和无关产品目录。
 

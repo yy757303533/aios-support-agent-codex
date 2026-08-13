@@ -10,4 +10,6 @@
 
 `aios` 允许全仓查询；其余四仓只允许查询 AIOS 相关模块和已命中代码的直接调用方，禁止无条件全仓扫描。完整功能链路按前端入口、后端 API、节点侧动作和 AIOS 应用资产逐级扩展，每次扩展必须由上一层命中的符号、API、消息或错误文本驱动。
 
+AIOS 是项目组名称，业务目录通常命名为 `ai`。后端优先 `plugin-premium/ai`，前端优先 `packages/products/cloud/apps/ai-store`；GPU 或 GuestTools 问题再增加对应的 GPU/GuestTools 目录。
+
 具体业务知识应由钉钉知识库、对应版本源码和已确认研发资料证明。本文件只承担路由，不承担产品事实。
