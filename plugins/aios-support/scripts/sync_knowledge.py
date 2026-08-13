@@ -44,10 +44,7 @@ DANGEROUS_ACTION = re.compile(
     r"(?i)(?:rm\s+-rf|kubectl\s+delete|drop\s+table|shutdown\b|reboot\b|"
     r"systemctl\s+(?:stop|restart)|sysctl\s+-w|apply.{0,12}destroy|"
     r"\b(?:chmod|chown|mount|umount|redis-cli)\b|"
-    r"删除(?:数据库|云主机|实例|目录|文件)|重启(?:管理节点|MN|数据库)|"
-    r"(?:^|[；。.!！?？]\s*)(?:手动|直接|请|执行|运行|点击|输入|使用|通过|需要|可以)?\s*"
-    r"(?:删除|重启|停止|启动|修改|替换|卸载)|"
-    r"(?:手动|执行|运行|点击|输入|将|把|请|需要|可以|然后|先).{0,40}(?:删除|重启|停止|启动|修改|替换|卸载))"
+    r"(?:删除|重启|停止|启动|修改|替换|卸载))"
 )
 MAX_DOCUMENT_CHARS = 1_000_000
 MAX_CHUNK_CHARS = 3_500

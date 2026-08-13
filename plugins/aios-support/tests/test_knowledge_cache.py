@@ -62,6 +62,7 @@ elif sys.argv[1:3] == ['doc', 'read']:
         'sysctl -w net.core.wmem_max=16777216\\n'
         '执行 chmod 777 /var/lib/example\\n'
         '请手动重启相关服务\\n'
+        '删除模型文件中的该调用\\n'
         '## Version 5.5\\nUse the supported read-only status check.\\n'}))
 else:
     raise SystemExit(2)
@@ -116,6 +117,7 @@ else:
         self.assertNotIn("sysctl -w", combined)
         self.assertNotIn("chmod", combined)
         self.assertNotIn("手动重启", combined)
+        self.assertNotIn("删除模型", combined)
         self.assertFalse((self.root / "published" / "current").exists())
         self.assertEqual(candidate.stat().st_mode & 0o777, 0o700)
         for path in candidate.iterdir():
