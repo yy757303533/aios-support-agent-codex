@@ -25,7 +25,8 @@ class LocalCodeSearchTest(unittest.TestCase):
         for name in ("aios", "premium"):
             work = self.root / f"{name}-work"
             work.mkdir()
-            subprocess.run(["git", "init", "-q", "-b", "master"], cwd=work, check=True)
+            subprocess.run(["git", "init", "-q"], cwd=work, check=True)
+            subprocess.run(["git", "symbolic-ref", "HEAD", "refs/heads/master"], cwd=work, check=True)
             subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=work, check=True)
             subprocess.run(["git", "config", "user.name", "Test"], cwd=work, check=True)
             target = work / ("server" if name == "aios" else "plugin-premium/ai-service")
