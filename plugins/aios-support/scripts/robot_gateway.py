@@ -21,8 +21,6 @@ QUERY_TIMEOUT = "本次本地查证超时，请缩小问题范围或补充准确
 SAFE_VALUE = re.compile(r"[A-Za-z0-9._-]{1,128}")
 ZDEV_REQUEST = re.compile(r"(?i)\b(?:jira|confluence)\b|工单")
 CODE_SYNC_REQUEST = re.compile(r"(?:同步|更新|拉取).{0,8}(?:代码|五仓|镜像)|(?:代码|五仓|镜像).{0,8}(?:同步|更新|拉取)")
-BBS_REQUEST = re.compile(r"(?i)\bbbs\b|论坛")
-WEB_REQUEST = re.compile(r"(?i)\b(?:tavily|web)\b|联网搜索|互联网搜索|公开资料")
 
 
 class GatewayError(Exception):
@@ -73,15 +71,12 @@ Sanitized question:
 """
 
 
-def connector_overrides(question: str) -> list[str]:
-    overrides = []
-    if not (ZDEV_REQUEST.search(question) or CODE_SYNC_REQUEST.search(question)):
-        overrides.extend(["-c", "mcp_servers.zdev_readonly.enabled=false"])
-    if not BBS_REQUEST.search(question):
-        overrides.extend(["-c", 'mcp_servers."zstack-bbs-support".enabled=false'])
-    if not WEB_REQUEST.search(question):
-        overrides.extend(["-c", "mcp_servers.tavily_hikari.enabled=false"])
-    return overrides
+def zdev_mode(question: str) -> str:
+    if CODE_SYNC_REQUEST.search(question):
+        return "sync"
+    if ZDEV_REQUEST.search(question):
+        return "support"
+    return "local"
 
 
 def run_codex(policy: dict, codex_bin: Path, prompt: str, question: str) -> str:
@@ -100,7 +95,6 @@ def run_codex(policy: dict, codex_bin: Path, prompt: str, question: str) -> str:
             "read-only",
             "-c",
             'approval_policy="never"',
-            *connector_overrides(question),
             "-o",
             str(output),
             "-m",
@@ -114,6 +108,7 @@ def run_codex(policy: dict, codex_bin: Path, prompt: str, question: str) -> str:
                 text=True,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
+                env={**os.environ, "AIOS_ZDEV_MODE": zdev_mode(question)},
                 timeout=policy["timeout_seconds"],
                 check=False,
             )

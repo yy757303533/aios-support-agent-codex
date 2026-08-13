@@ -66,7 +66,7 @@ for line in sys.stdin:
     def tearDown(self) -> None:
         self.temp.cleanup()
 
-    def start_proxy(self) -> subprocess.Popen[str]:
+    def start_proxy(self, mode: str = "support") -> subprocess.Popen[str]:
         env = os.environ.copy()
         env.update(
             {
@@ -75,6 +75,7 @@ for line in sys.stdin:
                 "AIOS_REFRESH_SCRIPT": str(self.refresh),
                 "AIOS_MIRROR_ROOT": str(self.mirrors),
                 "AIOS_REPOSITORY_MAP": str(self.repository_map),
+                "AIOS_ZDEV_MODE": mode,
             }
         )
         return subprocess.Popen(
@@ -106,13 +107,13 @@ for line in sys.stdin:
             response = self.request(process, {"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}})
             tools = response["result"]["tools"]
             self.assertEqual(
-                ["aios_refresh_code_mirrors", "confluence_search", "jira_search"],
+                ["confluence_search", "jira_search"],
                 sorted(tool["name"] for tool in tools),
             )
             for tool in tools:
                 self.assertFalse(tool["annotations"]["destructiveHint"])
                 self.assertTrue(tool["annotations"]["idempotentHint"])
-                self.assertEqual(tool["name"] != "aios_refresh_code_mirrors", tool["annotations"]["readOnlyHint"])
+                self.assertTrue(tool["annotations"]["readOnlyHint"])
         finally:
             self.stop_proxy(process)
 
@@ -130,6 +131,14 @@ for line in sys.stdin:
             )
             self.assertTrue(response["result"]["isError"])
             self.assertEqual("tool_not_allowed", response["result"]["content"][0]["text"])
+        finally:
+            self.stop_proxy(process)
+
+    def test_local_mode_exposes_no_remote_tools(self) -> None:
+        process = self.start_proxy("local")
+        try:
+            response = self.request(process, {"jsonrpc": "2.0", "id": 6, "method": "tools/list", "params": {}})
+            self.assertEqual([], response["result"]["tools"])
         finally:
             self.stop_proxy(process)
 
@@ -168,7 +177,7 @@ for line in sys.stdin:
             self.stop_proxy(process)
 
     def test_runs_only_fixed_mirror_refresh_entrypoint(self) -> None:
-        process = self.start_proxy()
+        process = self.start_proxy("sync")
         try:
             response = self.request(
                 process,

@@ -7,7 +7,7 @@ import { spawn } from 'node:child_process';
 
 const REFRESH_TOOL = 'aios_refresh_code_mirrors';
 
-const ALLOWED_TOOLS = new Set([
+const SUPPORT_TOOLS = new Set([
   'confluence_get_page',
   'confluence_get_page_children',
   'confluence_get_page_labels',
@@ -20,6 +20,9 @@ const ALLOWED_TOOLS = new Set([
   'jira_get_transitions',
   'jira_search',
 ]);
+const mode = process.env.AIOS_ZDEV_MODE || 'local';
+if (!['local', 'support', 'sync'].includes(mode)) throw new Error('invalid AIOS_ZDEV_MODE');
+const allowedTools = mode === 'support' ? SUPPORT_TOOLS : new Set();
 
 const configPath = process.env.ZDEV_MCP_CONFIG;
 const serverName = process.env.ZDEV_MCP_SERVER || 'zdev_upstream';
@@ -42,6 +45,7 @@ const refreshConfig = {
   repositoryMap: process.env.AIOS_REPOSITORY_MAP,
 };
 const refreshEnabled = Object.values(refreshConfig).every((value) => typeof value === 'string' && value.length > 0);
+const refreshAvailable = refreshEnabled && mode === 'sync';
 
 function send(message) {
   process.stdout.write(`${JSON.stringify(message)}\n`);
@@ -66,7 +70,7 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
     return;
   }
   const method = request.method;
-  if (method === 'tools/call' && request.params?.name === REFRESH_TOOL && refreshEnabled) {
+  if (method === 'tools/call' && request.params?.name === REFRESH_TOOL && refreshAvailable) {
     const child = spawn('python3', [
       refreshConfig.script,
       '--mirror-root', refreshConfig.mirrorRoot,
@@ -89,7 +93,7 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
     });
     return;
   }
-  if (method === 'tools/call' && !ALLOWED_TOOLS.has(request.params?.name)) {
+  if (method === 'tools/call' && !allowedTools.has(request.params?.name)) {
     deny(request, 'tool_not_allowed');
     return;
   }
@@ -119,12 +123,12 @@ readline.createInterface({ input: upstream.stdout }).on('line', (line) => {
     response.result = {
       ...response.result,
       tools: tools
-        .filter((tool) => ALLOWED_TOOLS.has(tool?.name))
+        .filter((tool) => allowedTools.has(tool?.name))
         .map((tool) => ({
           ...tool,
           annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
         }))
-        .concat(refreshEnabled ? [{
+        .concat(refreshAvailable ? [{
           name: REFRESH_TOOL,
           description: 'Fetch and prune the five registered AIOS bare mirrors. Never checkout, commit, or push.',
           inputSchema: { type: 'object', properties: {}, additionalProperties: false },
