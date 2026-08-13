@@ -37,7 +37,11 @@ ZStack终极知识库/ZStack AIOS 智塔
 
 ## 本地源码
 
-源码通过 `AIOS_CODE_MIRROR_ROOT` 下的五个 bare mirror 读取，不属于远端 MCP。脚本不提供 checkout、fetch、pull、push 或文件写入能力。
+源码通过 `AIOS_CODE_MIRROR_ROOT` 下的五个 bare mirror 读取，不属于远端 MCP。查询脚本不提供 checkout、fetch、pull、push 或文件写入能力。
+
+运行时额外提供受控的 `aios_refresh_code_mirrors`：它只调用 `scripts/refresh_mirrors.py`，对仓库地图中的五个 bare mirror 执行 fetch/prune。它不接受路径或远端参数，也不创建工作树、不提交、不 push；仅在内部售后明确要求更新代码时调用，不得定时运行。
+
+workspace `zdev` 不可直接注入机器人。`scripts/zdev_readonly_proxy.mjs` 在 MCP 协议层过滤 `tools/list` 和 `tools/call`，只保留批准的 GitLab/Jira/Confluence 读取工具与上述 mirror 更新入口。DWS/Codex 可对该代理免审批，但上游原始服务器必须保持 disabled。
 
 ## 安全门禁
 

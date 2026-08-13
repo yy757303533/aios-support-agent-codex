@@ -31,6 +31,10 @@ TAVILY_HIKARI_TOKEN
 
 所有连接器查询文本先通过 `scripts/sanitize_query.py`，所有机器人答案在发送前通过 `scripts/validate_answer.py`。插件安装测试会执行严格 MCP 策略和秘密扫描。
 
+机器人必须通过 `scripts/robot_gateway.py` 作为唯一 Agent 命令运行。网关从 root-only 策略文件读取服务端受众，输入先脱敏，Codex 只能生成 `config/answer.schema.json` 约束的 JSON，答案校验通过后才渲染；任一步失败只返回固定降级文案。不得把 DWS 直接连接到裸 `codex` 渠道。
+
+workspace 的 `zdev` 必须由 `scripts/configure_runtime.py mcp` 改造成禁用的 `zdev_upstream` 与启用的 `zdev_readonly`。只读代理仅暴露 GitLab/Jira/Confluence 查询工具；评论、修改 Issue、创建或更新 MR、提交和 push 均不可见且伪造调用会被拒绝。`aios_refresh_code_mirrors` 是唯一批准的本地写操作，只能对 `config/repository-map.json` 中登记的 bare mirror 执行 `git fetch --prune origin`，不 checkout、不 commit、不 push，并且不得配置定时执行。
+
 售后日志先通过内置日志与代码地图定位 MN、Host、VM、Container、Model Center 或 Storage 层，再在目标版本 CodeContext 中反查错误生成点、logger 调用点和直接调用方。源码无命中或日志来源不明时保留 `unknown`，不得猜测归属。
 
 钉钉知识使用人工双阶段发布：`scripts/sync_knowledge.py prepare` 生成已脱敏的 `pending_review` 候选，审核后用 `publish --confirm-reviewed` 发布不可变 release 并原子切换 `current`。禁止定时同步，禁止提交知识正文到 Git，禁止从未审核候选回答。
@@ -51,7 +55,7 @@ python3 scripts/sync_knowledge.py publish \
 
 ## 发布状态
 
-当前仓库是本地开发/验证插件，不是可直接上线的钉钉生产网关。CLI 门禁属于纵深防御，不能替代服务端身份和发送出口。生产机器人必须先完成服务端受众/RBAC 绑定、钉钉回调验签和防重放、唯一 fail-closed 发送适配器、TLS 或 mTLS 内部连接器、运行时 `tools/list` 校验、限流和审计；任一项缺失即禁止接入真实客户材料或自动发送答案。
+内部售后机器人只允许受控钉钉用户或群触发，DWS 必须配置 `--allowed-users` 或 `--allowed-groups`，受众固定为 `internal`。Codex 可以免交互执行代理暴露的查询和受控 mirror 更新，但不得暴露裸 `zdev` 或任意工作区写权限。BBS 端点没有 TLS/mTLS 时仍属于明确风险例外；切换到 HTTPS 代理前不得扩大到外部客户。
 
 ## 创建 bare mirror
 
@@ -68,4 +72,4 @@ git clone --mirror <zstack-ui-next-url> "$AIOS_CODE_MIRROR_ROOT/zstack-ui-next.g
 
 ## 版本配置
 
-复制 `config/version-sets.example.json` 到运行数据目录，补齐正式发布版本的真实 commit。示例文件故意包含空 commit，校验会失败，避免误把示例当作正式快照。
+`config/release-refs.json` 声明人工批准的发布分支映射。使用 `scripts/freeze_version_set.py` 从五个 bare mirror 将这些 ref 冻结为 40 位 commit，并输出 root-only 的正式运行清单；随后必须同时通过 `validate_version_sets.py` 和 `resolve_code_context.py --version`。分支继续移动不会改变已冻结清单，更新发布基线必须重新人工执行冻结流程。

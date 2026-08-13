@@ -1,0 +1,10 @@
+{
+  "version": "5.5.28",
+  "refs": {
+    "aios": "master",
+    "zstack": "feature-5.5.28-aios",
+    "premium": "feature-5.5.28-aios",
+    "zstack-utility": "feature-5.5.28-aios",
+    "zstack-ui-next": "feature-5.5.28-aios"
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status",
+    "audience",
+    "version",
+    "conclusion",
+    "actions",
+    "uncertainties",
+    "completeness",
+    "sources",
+    "internal_sources"
+  ],
+  "properties": {
+    "status": {
+      "enum": [
+        "answered",
+        "needs_version",
+        "needs_more_context",
+        "conflicting_evidence",
+        "insufficient_evidence",
+        "source_unavailable",
+        "permission_denied",
+        "handoff_required"
+      ]
+    },
+    "audience": { "enum": ["internal", "sales", "customer"] },
+    "version": { "type": ["string", "null"] },
+    "conclusion": { "type": "string" },
+    "actions": { "type": "array", "items": { "type": "string" } },
+    "uncertainties": { "type": "array", "items": { "type": "string" } },
+    "completeness": { "enum": ["complete", "partial", "unknown"] },
+    "sources": { "$ref": "#/$defs/sources" },
+    "internal_sources": { "$ref": "#/$defs/sources" }
+  },
+  "$defs": {
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "title"],
+        "properties": {
+          "type": { "type": "string" },
+          "title": { "type": "string" },
+          "url": { "type": "string" }
+        }
+      }
+    }
+  }
+}
