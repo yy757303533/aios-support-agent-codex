@@ -383,6 +383,12 @@ class SecurityBoundaryTest(unittest.TestCase):
         RedactingFilter().filter(record)
         self.assertNotIn("do-not-log", record.getMessage())
 
+        ticket_record = logging.LogRecord(
+            "test", logging.INFO, "", 0, "endpoint={'ticket': 'short-lived-value'}", (), None
+        )
+        RedactingFilter().filter(ticket_record)
+        self.assertNotIn("short-lived-value", ticket_record.getMessage())
+
     def test_card_variables_match_published_template(self):
         data = CardClient.data("问题", "排队中", "结论")
         self.assertEqual({"lastMessage", "config", "query", "preparations", "charts", "content"}, set(data))

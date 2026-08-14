@@ -35,7 +35,7 @@ BUSY_MESSAGE = "当前请求较多，请稍后重试。"
 FAILED_MESSAGE = "处理失败，请稍后重试；如仍失败，请补充准确版本和已脱敏现象。"
 MAX_CAPTURE_BYTES = 64_000
 LOG_REDACTION = re.compile(
-    r"(?i)(appsecret|clientsecret|authorization|token|password)([\s:=]+)([^\s,;]+)"
+    r"(?i)(appsecret|clientsecret|authorization|token|password|ticket)([\s':=]+)([^\s,;]+)"
 )
 
 
