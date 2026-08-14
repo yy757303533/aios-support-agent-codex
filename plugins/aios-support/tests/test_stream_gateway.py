@@ -112,6 +112,16 @@ class StateStoreTest(unittest.TestCase):
         self.assertEqual("5.5.28", resolve_version("继续看这个问题", "5.5.30", "5.5.28", versions))
         self.assertEqual("5.5.30", resolve_version("AIOS 5.5.30 怎么处理", "5.5.30", "5.5.28", versions))
 
+    def test_upgrade_question_uses_target_version(self):
+        versions = Path(self.temp.name) / "upgrade-versions.json"
+        versions.write_text(
+            json.dumps({"version_sets": {"5.5.22": {}, "5.5.30": {}}}), encoding="utf-8"
+        )
+        self.assertEqual(
+            "5.5.30",
+            resolve_version("AIOS 5.5.22 升级 5.5.30 后指标变化", "5.5.30", None, versions),
+        )
+
 
 class FakeCards:
     def __init__(self):
@@ -164,6 +174,16 @@ class FailingRunner(FakeRunner):
 class UnexpectedRunner(FakeRunner):
     async def run(self, policy, prompt, code_lookup):
         raise AssertionError("model must not run for /new")
+
+
+class CapturingRunner(FakeRunner):
+    def __init__(self):
+        super().__init__()
+        self.prompts = []
+
+    async def run(self, policy, prompt, code_lookup):
+        self.prompts.append((prompt, code_lookup))
+        return "对比结论"
 
 
 class SchedulerTest(unittest.IsolatedAsyncioTestCase):
@@ -287,6 +307,31 @@ class SchedulerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([], store.history(item.session_key))
         content = next(event[2] for event in cards.events if event[1] == "FINISHED")
         self.assertIn("已开始新的 AIOS 支持会话", content)
+
+    async def test_upgrade_comparison_collects_both_version_snapshots(self):
+        self.versions.write_text(
+            json.dumps({"version_sets": {"5.5.22": {}, "5.5.30": {}}}), encoding="utf-8"
+        )
+        cards, runner = FakeCards(), CapturingRunner()
+        service = GatewayService(StateStore(self.root / "upgrade.db"), self.policy, self.versions, cards, runner, 1, 2)
+        service.start()
+        base = incoming()
+        item = IncomingMessage(
+            base.msg_id, base.conversation_id, base.conversation_type, base.sender_staff_id,
+            base.sender_corp_id, base.robot_code,
+            "AIOS 5.5.22 升级 5.5.30 后 metrics 有什么变化", base.mentioned, base.sdk_message,
+        )
+        with mock.patch(
+            "stream_gateway.collect_code_evidence",
+            side_effect=lambda policy, version, version_sets, question: f"evidence-{version}",
+        ) as collect:
+            service.submit(item)
+            await service.join()
+        await service.close()
+        self.assertEqual(["5.5.22", "5.5.30"], [call.args[1] for call in collect.call_args_list])
+        self.assertTrue(runner.prompts[0][1])
+        self.assertIn("evidence-5.5.22", runner.prompts[0][0])
+        self.assertIn("evidence-5.5.30", runner.prompts[0][0])
 
 
 class ProcessGroupTest(unittest.IsolatedAsyncioTestCase):
@@ -453,6 +498,7 @@ class OfficialCardAdapterTest(unittest.IsolatedAsyncioTestCase):
             [call[0] for call in calls],
         )
         self.assertFalse(calls[1][3])
+        self.assertIn("已接收", calls[1][2]["content"])
         self.assertEqual("content", calls[2][2])
         self.assertIn("已接收", calls[2][3])
         self.assertEqual("结论", calls[5][2]["content"])

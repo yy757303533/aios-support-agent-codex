@@ -26,7 +26,8 @@ CODE_SYNC_REQUEST = re.compile(r"(?:同步|更新|拉取).{0,8}(?:代码|五仓|
 CODE_LOOKUP_REQUEST = re.compile(
     r"源码|查代码|代码实现|调用链|logger|错误生成位置|类名|方法实现|"
     r"(?i:\b(?:vllm|sglang|zsml|modelservice|guesttools|dgpu|gpu|traceback|exception)\b)|"
-    r"性能优化工具|推理服务|模型加载|模型下载|下载任务|模型中心|未初始化|状态异常"
+    r"性能优化工具|推理服务|推理模板|模型加载|模型下载|下载任务|模型中心|"
+    r"metrics|升级.{0,12}(?:变化|变更|差异|异常)|未初始化|状态异常"
 )
 CODE_IDENTIFIER = re.compile(r"[A-Za-z][A-Za-z0-9_.:-]{2,127}")
 VERSION_LINE = re.compile(r"^分析版本：AIOS\s+\d+\.\d+\.\d+(?:（当前最新发布版）)?$")

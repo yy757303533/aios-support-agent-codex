@@ -37,6 +37,9 @@ MAX_CAPTURE_BYTES = 64_000
 LOG_REDACTION = re.compile(
     r"(?i)(appsecret|clientsecret|authorization|token|password|ticket)([\s':=]+)([^\s,;]+)"
 )
+UPGRADE_PATH = re.compile(
+    r"(?i)\bAIOS\s*(\d+\.\d+\.\d+)\b.{0,24}?(?:升级(?:到)?|升到|->|→)\s*(?:AIOS\s*)?(\d+\.\d+\.\d+)\b"
+)
 
 
 @dataclass(frozen=True)
@@ -180,6 +183,9 @@ class StateStore:
 
 
 def resolve_version(question: str, default_version: str, inherited: Optional[str], version_sets: Path) -> str:
+    upgrade = UPGRADE_PATH.search(question)
+    if upgrade:
+        return select_version(f"AIOS {upgrade.group(2)}", default_version, version_sets)
     explicit = re.search(r"(?i)\bAIOS\s*(?:版本\s*)?(\d+\.\d+\.\d+)\b", question)
     selected_default = inherited or default_version
     return select_version(question if explicit else "", selected_default, version_sets)
@@ -319,7 +325,9 @@ class CardClient:
 
         replier = AICardReplier(self.client, incoming.sdk_message)
         card_id = await replier.async_start(
-            self.template_id, self.data(incoming.text, "已接收，等待处理"), support_forward=False
+            self.template_id,
+            self.data(incoming.text, "已接收，等待处理", "⏳ 已接收，等待处理"),
+            support_forward=False,
         )
         if not card_id:
             raise GatewayError("card_create_failed")
@@ -446,10 +454,33 @@ class GatewayService:
             )
             await self.cards.stage(card, incoming.text, f"正在检索 AIOS {version} 本地五仓与知识库")
             code_lookup = bool(CODE_LOOKUP_REQUEST.search(question))
-            evidence = await asyncio.to_thread(
-                collect_code_evidence, self.policy, version, self.version_sets, question
-            ) if code_lookup else None
+            evidence = None
+            upgrade = UPGRADE_PATH.search(question)
+            if code_lookup:
+                evidence_versions = [version]
+                if upgrade and upgrade.group(1) != version:
+                    source_version = select_version(
+                        f"AIOS {upgrade.group(1)}", self.policy["default_version"], self.version_sets
+                    )
+                    evidence_versions.insert(0, source_version)
+                evidence_parts = []
+                for evidence_version in evidence_versions:
+                    result = await asyncio.to_thread(
+                        collect_code_evidence,
+                        self.policy,
+                        evidence_version,
+                        self.version_sets,
+                        question,
+                    )
+                    evidence_parts.append(f"AIOS {evidence_version}:\n{result}")
+                evidence = "\n\n".join(evidence_parts)
             prompt = build_prompt(question, self.policy["audience"], version, self.version_sets, code_lookup, evidence)
+            if upgrade:
+                prompt += (
+                    f"\n\nThis is an upgrade comparison from AIOS {upgrade.group(1)} to "
+                    f"AIOS {upgrade.group(2)}. Compare both frozen local snapshots and treat "
+                    f"AIOS {upgrade.group(2)} as the target analysis version."
+                )
             prompt = contextual_prompt(question, self.store.history(incoming.session_key), prompt)
             await self.cards.stage(card, incoming.text, "正在生成结论")
             model_task = asyncio.create_task(self.runner.run(self.policy, prompt, code_lookup))
