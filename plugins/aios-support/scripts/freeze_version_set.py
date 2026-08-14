@@ -9,7 +9,7 @@ import os
 import re
 import subprocess
 import tempfile
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -94,7 +94,7 @@ def freeze(repository_map_path: Path, mirror_root: Path, release_refs_path: Path
         if mirror.parent != root or not mirror.is_dir() or mirror.is_symlink() or not isinstance(ref, str):
             raise FreezeError("repository_invalid")
         frozen[name] = {"ref": ref, "commit": resolve_ref(mirror, ref)}
-    captured_at = datetime.now(UTC).replace(microsecond=0).isoformat()
+    captured_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
     return {
         "version_sets": {
             version: {

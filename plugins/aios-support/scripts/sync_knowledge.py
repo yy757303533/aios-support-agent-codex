@@ -12,7 +12,7 @@ import re
 import shutil
 import subprocess
 import sys
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -60,7 +60,7 @@ def digest(text: str) -> str:
 
 
 def utc_now() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat()
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
 def load_json(path: Path) -> object:
@@ -241,7 +241,9 @@ def validate_snapshot_id(value: str) -> str:
 
 def prepare(args: argparse.Namespace) -> dict[str, object]:
     sources = validate_source_config(args.sources.resolve())
-    snapshot_id = validate_snapshot_id(args.snapshot_id or datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ"))
+    snapshot_id = validate_snapshot_id(
+        args.snapshot_id or datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    )
     candidate_root = args.candidate_root.resolve()
     candidate = candidate_root / snapshot_id
     if candidate.exists():
