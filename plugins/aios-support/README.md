@@ -31,7 +31,9 @@ TAVILY_HIKARI_TOKEN
 
 所有连接器查询文本先通过 `scripts/sanitize_query.py`。`scripts/validate_answer.py` 保留给未来的销售或客户输出场景；当前内部售后机器人不执行结构化答案门禁。插件安装测试会执行严格 MCP 策略和秘密扫描。
 
-机器人必须通过 `scripts/robot_gateway.py` 作为唯一 Agent 命令运行。网关从 root-only 策略文件读取固定的 `internal` 受众，输入先脱敏，并用只读 sandbox 运行 Codex。内部群问答直接返回纯文本或 Markdown；模型调用失败时明确返回运行错误，不使用安全降级文案。不得把 DWS 直接连接到裸 `codex` 渠道。
+正式机器人必须通过 `scripts/stream_gateway.py` 接入钉钉 Stream；`scripts/robot_gateway.py` 仅保留给 DWS 本地调试。网关从 root-only 策略文件读取固定的 `internal` 受众，输入先脱敏，并在 `/mnt/repos/zstack-workspace` 的只读 sandbox 中运行 Codex。120 秒内完成时直接结束卡片；超过 120 秒时卡片提示已转后台，任务继续运行并在同一卡片返回，最长运行 20 分钟。回答固定展示分析版本，不单独展示“信息来源”或“依据”附录。
+
+开发机使用 `scripts/install-stream-service.sh` 安装。安装器先验证插件、运行时、凭据权限和钉钉连接，Stream 服务成功连接后才停用旧 DWS 服务。
 
 workspace 的 `zdev` 必须由 `scripts/configure_runtime.py mcp` 改造成禁用的 `zdev_upstream` 与启用的 `zdev_readonly`。只读代理暴露 Jira/Confluence 查询和版本绑定的 `aios_search_local_code`，不暴露任何 GitLab 代码读取或搜索工具；源码始终查询开发机本地五仓 bare mirror。评论、修改 Issue、提交和 push 均不可见且伪造调用会被拒绝。`aios_refresh_code_mirrors` 是唯一批准的本地写操作，只能对 `config/repository-map.json` 中登记的 bare mirror 执行 `git fetch --prune origin`，不 checkout、不 commit、不 push，并且不得配置定时执行。
 

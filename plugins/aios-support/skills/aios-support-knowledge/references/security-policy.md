@@ -70,6 +70,6 @@
 - 钉钉网关上线前另行完成回调签名、重放防护、群/用户 RBAC、频率限制和审计日志检查。
 - 网关必须把服务端身份确定的 audience 与答案绑定，并提供不可绕过的唯一发送出口；不得让模型、用户输入或 CLI 参数决定权限。
 
-当前内部售后部署使用 DWS Stream 的企业组织应用身份作为入口边界，仅供内部群使用，不维护人员白名单。`robot_gateway.py` 是唯一 Agent 命令，策略固定 `internal` 受众，内部回答直接输出纯文本或 Markdown，不执行结构化答案门禁。Codex 的免审批权限仅能作用于 MCP 只读代理和受控 bare mirror 更新；裸 `zdev`、工作区写入、commit 和 push 必须在运行时不可达。
+当前内部售后部署使用钉钉 Stream 企业组织应用身份作为入口边界，仅供内部群使用，不维护人员白名单。`stream_gateway.py` 是正式唯一发送出口，`robot_gateway.py` 仅用于 DWS 本地调试；策略固定 `internal` 受众，内部回答直接输出纯文本或 Markdown，不执行结构化答案门禁。Codex 的免审批权限仅能作用于 MCP 只读代理和受控 bare mirror 更新；裸 `zdev`、工作区写入、commit 和 push 必须在运行时不可达。
 - 网关启动时校验远端 `tools/list` 的名称、描述和输入 schema，发现漂移立即 fail closed。
 - BBS 没有 HTTPS 地址，固定内网 HTTP 端点属于已知只读风险例外；不得向外部客户开放或增加写工具。

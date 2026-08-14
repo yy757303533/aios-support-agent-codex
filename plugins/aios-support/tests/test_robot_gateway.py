@@ -16,6 +16,21 @@ from robot_gateway import code_terms  # noqa: E402
 
 
 class RobotGatewayTest(unittest.TestCase):
+    def test_answer_shows_version_without_source_appendix(self) -> None:
+        answer = "结论内容。\n\n信息来源：本地五仓快照 + AIOS 故障知识库\n\n依据\n- 源码：a.py\n- 文档：排查指南"
+
+        result = self.run_gateway("正常问题", answer)
+
+        self.assertEqual("分析版本：AIOS 5.5.30（当前最新发布版）\n\n结论内容。\n", result.stdout)
+
+    def test_historical_version_has_no_latest_marker(self) -> None:
+        result = self.run_gateway("AIOS 5.5.28 的正常问题", "结论内容。")
+
+        self.assertEqual(
+            "分析版本：AIOS 5.5.28\n\n结论内容。\n",
+            result.stdout,
+        )
+
     def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
@@ -105,7 +120,7 @@ sys.exit(int(os.environ.get('FAKE_CODEX_EXIT', '0')))
 
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertTrue(self.marker.exists())
-        self.assertEqual("该能力在目标版本中可用。\n", result.stdout)
+        self.assertEqual("分析版本：AIOS 5.5.30（当前最新发布版）\n\n该能力在目标版本中可用。\n", result.stdout)
 
     def test_rejects_secret_input_without_invoking_codex(self) -> None:
         secret_name = "api_" + "key"
@@ -120,7 +135,7 @@ sys.exit(int(os.environ.get('FAKE_CODEX_EXIT', '0')))
 
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertTrue(self.marker.exists())
-        self.assertEqual("日志定位结果\n", result.stdout)
+        self.assertEqual("分析版本：AIOS 5.5.30（当前最新发布版）\n\n日志定位结果\n", result.stdout)
 
     def test_model_failure_reports_runtime_error_not_security_downgrade(self) -> None:
         result = self.run_gateway("正常问题", "", exit_code=1)
@@ -133,7 +148,7 @@ sys.exit(int(os.environ.get('FAKE_CODEX_EXIT', '0')))
         result = self.run_gateway("正常问题", "直接回答，不要求 JSON。")
 
         self.assertEqual(0, result.returncode)
-        self.assertEqual("直接回答，不要求 JSON。\n", result.stdout)
+        self.assertEqual("分析版本：AIOS 5.5.30（当前最新发布版）\n\n直接回答，不要求 JSON。\n", result.stdout)
 
     def test_domain_support_question_uses_precomputed_local_evidence(self) -> None:
         result = self.run_gateway("AIOS 5.5.30 的 dGPU 为什么未初始化？", "本地结论")

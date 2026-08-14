@@ -1,0 +1,51 @@
+[Unit]
+Description=AIOS Support DingTalk Stream Gateway
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/mnt/repos/zstack-workspace/aios-support-agent-codex/plugins/aios-support/scripts
+Environment=HOME=/root
+Environment=PATH=/root/.nvm/versions/node/v22.23.2/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin
+EnvironmentFile=-/etc/aios-support/secrets.env
+Environment=AIOS_GATEWAY_POLICY=/etc/aios-support/gateway-policy.json
+Environment=AIOS_VERSION_SETS_FILE=/etc/aios-support/version-sets.json
+Environment=AIOS_DINGTALK_CREDENTIALS=/etc/aios-support/dingtalk-stream-credentials.json
+Environment=AIOS_STREAM_STATE=/var/lib/aios-support-stream/state.db
+Environment=AIOS_CODEX_BIN=/usr/local/bin/codex
+Environment=AIOS_CODE_MIRROR_ROOT=/mnt/repos/zstack-workspace/mirrors
+Environment=AIOS_REPOSITORY_MAP=/mnt/repos/zstack-workspace/aios-support-agent-codex/plugins/aios-support/config/repository-map.json
+Environment=AIOS_LOCAL_SEARCH_SCRIPT=/mnt/repos/zstack-workspace/aios-support-agent-codex/plugins/aios-support/scripts/search_local_code.py
+Environment=AIOS_CARD_TEMPLATE_ID=513ff894-423b-4178-9ea6-ed17600b809f.schema
+Environment=AIOS_STREAM_CONCURRENCY=3
+Environment=AIOS_STREAM_QUEUE_SIZE=12
+Environment=AIOS_STREAM_MAX_SECONDS=1200
+Environment=HTTP_PROXY=http://172.20.11.159:8888
+Environment=HTTPS_PROXY=http://172.20.11.159:8888
+Environment=NO_PROXY=localhost,127.0.0.1,172.16.0.0/12,10.0.0.0/8,.zstack.io
+ExecStartPre=/opt/aios-support-stream/venv/bin/python /mnt/repos/zstack-workspace/aios-support-agent-codex/plugins/aios-support/scripts/validate_stream_runtime.py
+ExecStart=/opt/aios-support-stream/venv/bin/python /mnt/repos/zstack-workspace/aios-support-agent-codex/plugins/aios-support/scripts/stream_gateway.py
+Restart=always
+RestartSec=5s
+TimeoutStopSec=8s
+KillMode=control-group
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=no
+ReadWritePaths=/var/lib/aios-support-stream /root/.codex
+ReadOnlyPaths=/etc/aios-support /mnt/repos/zstack-workspace /opt/aios-support-stream /usr/local/bin/codex
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
