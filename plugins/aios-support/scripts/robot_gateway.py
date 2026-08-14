@@ -85,6 +85,12 @@ def code_terms(question: str) -> list[str]:
         terms.extend(["dGPU", "DGpuStatus", "Unknown"])
     if "guesttools" in lowered or "guest tools" in lowered or "性能优化工具" in question:
         terms.extend(["GuestTools", "GuestToolsVersion", "isInNewFormat", "linuxUpdateTooltip"])
+    if "模型下载" in question or "下载任务" in question or "模型中心" in question:
+        terms.extend(["DownloadManager", "download"])
+    if "暂停" in question:
+        terms.append("paused")
+    if "清理" in question:
+        terms.extend(["cleanup", "expired"])
     ignored = {"aios", "version", "source", "code", "local"}
     terms.extend(
         code_term
