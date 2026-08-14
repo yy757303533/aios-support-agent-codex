@@ -137,6 +137,20 @@ sys.exit(int(os.environ.get('FAKE_CODEX_EXIT', '0')))
         self.assertEqual(0, result.returncode)
         self.assertEqual("evidence", self.mode_file.read_text(encoding="utf-8"))
 
+    def test_model_download_question_uses_precomputed_local_evidence(self) -> None:
+        questions = (
+            "AIOS 5.5.30 的模型下载逻辑在哪里？",
+            "AIOS 5.5.30 的下载任务暂停后如何清理？",
+            "AIOS 5.5.30 的模型中心如何下载模型？",
+        )
+        for question in questions:
+            with self.subTest(question=question):
+                result = self.run_gateway(question, "本地结论")
+
+                self.assertEqual(0, result.returncode)
+                self.assertEqual("evidence", self.mode_file.read_text(encoding="utf-8"))
+                self.assertIn("devops/run.sh", self.prompt_file.read_text(encoding="utf-8"))
+
     def test_explicit_jira_question_keeps_zdev_available(self) -> None:
         result = self.run_gateway("请查询 Jira AIOS-123", "Jira 结论")
 
