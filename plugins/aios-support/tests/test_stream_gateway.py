@@ -514,58 +514,50 @@ class SecurityBoundaryTest(unittest.TestCase):
 
 
 class OfficialCardAdapterTest(unittest.IsolatedAsyncioTestCase):
-    async def test_create_stage_finish_and_fail_use_ai_card_apis(self):
+    async def test_processing_and_result_use_atomic_markdown_card_updates(self):
         calls = []
 
-        class FakeReplier:
+        class FakeMarkdownCard:
             def __init__(self, client, message):
                 calls.append(("init", client, message))
+                self.card_instance_id = None
 
-            async def async_start(self, template, data, support_forward):
-                calls.append(("start", template, data, support_forward))
-                return "card-id"
+            def set_title_and_logo(self, title, logo):
+                calls.append(("title", title, logo))
 
-            async def async_put_card_data(self, card_id, data):
-                calls.append(("stage", card_id, data))
+            def reply(self, markdown, support_forward):
+                calls.append(("reply", markdown, support_forward))
+                self.card_instance_id = "card-id"
 
-            async def async_streaming(self, card_id, key, value, append, finished, failed):
-                calls.append(("stream", card_id, key, value, append, finished, failed))
+            def update(self, markdown):
+                calls.append(("update", markdown))
 
-            async def async_finish(self, card_id, data):
-                calls.append(("finish", card_id, data))
-
-            async def async_fail(self, card_id, data):
-                calls.append(("fail", card_id, data))
-
-        fake_module = SimpleNamespace(AICardReplier=FakeReplier)
+        fake_module = SimpleNamespace(MarkdownCardInstance=FakeMarkdownCard)
         with mock.patch.dict(sys.modules, {"dingtalk_stream": fake_module}):
             cards = CardClient("client")
             handle = await cards.create(incoming(), "上一条问题处理中，本问题已排队（第 1 位）")
             await cards.stage(handle, "问题", "检索")
             await cards.finish(handle, "问题", "结论")
-            await cards.fail(handle, "问题")
-        self.assertEqual(
-            ["init", "start", "stream", "stage", "finish", "stream", "fail", "stream"],
-            [call[0] for call in calls],
-        )
-        self.assertFalse(calls[1][3])
-        self.assertIn("已排队", calls[1][2]["content"])
-        self.assertEqual("content", calls[2][2])
-        self.assertIn("已排队", calls[2][3])
-        self.assertIn("正在分析", calls[3][2]["content"])
-        self.assertEqual("结论", calls[4][2]["content"])
-        self.assertEqual("结论", calls[5][3])
-        self.assertTrue(calls[5][5])
+            await cards.needs_input(handle, "问题", "需要补充日志")
+        self.assertEqual(["init", "title", "reply", "update", "update", "update"], [call[0] for call in calls])
+        self.assertIn("已排队", calls[2][1])
+        self.assertIn("检索", calls[3][1])
+        self.assertEqual("结论", calls[4][1])
+        self.assertEqual("需要补充日志", calls[5][1])
+        self.assertFalse(calls[2][2])
 
     async def test_empty_card_id_fails_before_model_work(self):
-        class EmptyReplier:
+        class EmptyCard:
             def __init__(self, client, message):
+                self.card_instance_id = None
+
+            def set_title_and_logo(self, title, logo):
                 pass
 
-            async def async_start(self, template, data, support_forward):
-                return ""
+            def reply(self, markdown, support_forward):
+                pass
 
-        with mock.patch.dict(sys.modules, {"dingtalk_stream": SimpleNamespace(AICardReplier=EmptyReplier)}):
+        with mock.patch.dict(sys.modules, {"dingtalk_stream": SimpleNamespace(MarkdownCardInstance=EmptyCard)}):
             with self.assertRaisesRegex(GatewayError, "card_create_failed"):
                 await CardClient("client").create(incoming())
 

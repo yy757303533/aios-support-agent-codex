@@ -336,50 +336,43 @@ class CardClient:
             "content": content,
         }
 
+    @staticmethod
+    def processing_markdown(query: str, preparation: str) -> str:
+        summary = query if len(query) <= 240 else query[:237] + "..."
+        return f"### {preparation}\n\n> {summary}"
+
     async def create(
         self, incoming: IncomingMessage, preparation: str = "已接收，等待处理"
     ) -> tuple[Any, str]:
-        from dingtalk_stream import AICardReplier
+        from dingtalk_stream import MarkdownCardInstance
 
-        replier = AICardReplier(self.client, incoming.sdk_message)
-        card_id = await replier.async_start(
-            self.template_id,
-            self.data(incoming.text, preparation, f"⏳ {preparation}"),
+        replier = MarkdownCardInstance(self.client, incoming.sdk_message)
+        replier.set_title_and_logo("AIOS 售后分析", "")
+        await asyncio.to_thread(
+            replier.reply,
+            self.processing_markdown(incoming.text, preparation),
             support_forward=False,
         )
+        card_id = replier.card_instance_id
         if not card_id:
             raise GatewayError("card_create_failed")
-        await replier.async_streaming(
-            card_id, "content", f"⏳ {preparation}", append=False, finished=False, failed=False
-        )
         return replier, card_id
 
     async def stage(self, handle: tuple[Any, str], query: str, preparation: str) -> None:
         replier, card_id = handle
-        await replier.async_put_card_data(
-            card_id, self.data(query, preparation, "⏳ 已接收，正在分析")
-        )
+        await asyncio.to_thread(replier.update, self.processing_markdown(query, preparation))
 
     async def finish(self, handle: tuple[Any, str], query: str, content: str) -> None:
         replier, card_id = handle
-        await replier.async_finish(card_id, self.data(query, "已完成", content))
-        await replier.async_streaming(
-            card_id, "content", content, append=False, finished=True, failed=False
-        )
+        await asyncio.to_thread(replier.update, content)
 
     async def fail(self, handle: tuple[Any, str], query: str, content: str = FAILED_MESSAGE) -> None:
         replier, card_id = handle
-        await replier.async_fail(card_id, self.data(query, "处理失败", content))
-        await replier.async_streaming(
-            card_id, "content", content, append=False, finished=True, failed=True
-        )
+        await asyncio.to_thread(replier.update, content)
 
     async def needs_input(self, handle: tuple[Any, str], query: str, content: str) -> None:
         replier, card_id = handle
-        await replier.async_finish(card_id, self.data(query, "需要补充信息", content))
-        await replier.async_streaming(
-            card_id, "content", content, append=False, finished=True, failed=False
-        )
+        await asyncio.to_thread(replier.update, content)
 
 
 @dataclass
