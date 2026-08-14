@@ -14,7 +14,7 @@ import sqlite3
 import stat
 import sys
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Optional
 
@@ -110,7 +110,17 @@ class StateStore:
                     question TEXT NOT NULL, answer TEXT NOT NULL, version TEXT NOT NULL,
                     created_at REAL NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS request_metrics (
+                    request_id TEXT PRIMARY KEY, created_at REAL NOT NULL,
+                    question_type TEXT NOT NULL, analysis_version TEXT NOT NULL,
+                    result_status TEXT NOT NULL, queue_wait_ms INTEGER NOT NULL,
+                    local_search_ms INTEGER NOT NULL, codex_exec_ms INTEGER NOT NULL,
+                    card_ms INTEGER NOT NULL, total_ms INTEGER NOT NULL,
+                    cache_hit INTEGER NOT NULL DEFAULT 0,
+                    remote_knowledge_used INTEGER NOT NULL DEFAULT 0
+                );
                 CREATE INDEX IF NOT EXISTS turns_session_time ON turns(session_key, created_at DESC);
+                CREATE INDEX IF NOT EXISTS request_metrics_created_at ON request_metrics(created_at DESC);
                 """
             )
             db.execute(
@@ -196,6 +206,30 @@ class StateStore:
             return db.execute(
                 "SELECT COUNT(*) FROM messages WHERE session_key=? AND status='needs_retry'", (session_key,)
             ).fetchone()[0]
+
+    def record_metrics(self, request_id: str, question_type: str, analysis_version: str,
+                       result_status: str, queue_wait_ms: int, local_search_ms: int,
+                       codex_exec_ms: int, card_ms: int, total_ms: int,
+                       cache_hit: bool = False, remote_knowledge_used: bool = False) -> None:
+        now = time.time()
+        values = (
+            request_id, now, question_type, analysis_version, result_status,
+            queue_wait_ms, local_search_ms, codex_exec_ms, card_ms, total_ms,
+            int(cache_hit), int(remote_knowledge_used),
+        )
+        with self._database() as db:
+            db.execute(
+                "INSERT INTO request_metrics VALUES(?,?,?,?,?,?,?,?,?,?,?,?) "
+                "ON CONFLICT(request_id) DO UPDATE SET "
+                "created_at=excluded.created_at, question_type=excluded.question_type, "
+                "analysis_version=excluded.analysis_version, result_status=excluded.result_status, "
+                "queue_wait_ms=excluded.queue_wait_ms, local_search_ms=excluded.local_search_ms, "
+                "codex_exec_ms=excluded.codex_exec_ms, card_ms=excluded.card_ms, "
+                "total_ms=excluded.total_ms, cache_hit=excluded.cache_hit, "
+                "remote_knowledge_used=excluded.remote_knowledge_used",
+                values,
+            )
+            db.execute("DELETE FROM request_metrics WHERE created_at < ?", (now - 30 * 86400,))
 
 
 def resolve_version(question: str, default_version: str, inherited: Optional[str], version_sets: Path) -> str:
@@ -380,6 +414,8 @@ class WorkItem:
     incoming: IncomingMessage
     card: Optional[tuple[Any, str]] = None
     queue_position: int = 0
+    accepted_at: float = field(default_factory=time.perf_counter)
+    card_seconds: float = 0.0
 
 
 class GatewayService:
@@ -440,7 +476,9 @@ class GatewayService:
                 preparation = "已接收，等待处理"
                 if item.queue_position:
                     preparation = f"上一条问题还在处理中，本问题已排队（第 {item.queue_position} 位）"
+                started = time.perf_counter()
                 item.card = await self.cards.create(item.incoming, preparation)
+                item.card_seconds += time.perf_counter() - started
                 self.store.set_message(item.incoming.msg_id, "queued", item.card[1])
                 await self.ready_queue.put(item)
             except Exception:
@@ -494,9 +532,19 @@ class GatewayService:
     async def _process(self, item: WorkItem) -> None:
         incoming, card = item.incoming, item.card
         assert card is not None
+        process_started = time.perf_counter()
+        queue_wait_ms = round((process_started - item.accepted_at) * 1000)
+        local_search_ms = 0
+        codex_exec_ms = 0
+        question_type = "general"
+        version = self.policy["default_version"]
+        result_status = "needs_retry"
         try:
             self.store.set_message(incoming.msg_id, "running")
+            started = time.perf_counter()
             await self.cards.stage(card, incoming.text, "正在解析版本与问题")
+            item.card_seconds += time.perf_counter() - started
+            local_started = time.perf_counter()
             cleaned = sanitize(incoming.text)
             if not cleaned.get("safe"):
                 raise GatewayError("unsafe_input")
@@ -509,15 +557,22 @@ class GatewayService:
                     version,
                     self.policy["default_version"],
                 )
+                local_search_ms = round((time.perf_counter() - local_started) * 1000)
+                started = time.perf_counter()
                 await self.cards.finish(card, incoming.text, answer)
+                item.card_seconds += time.perf_counter() - started
                 self.store.set_message(incoming.msg_id, "finished")
+                result_status = "finished"
                 return
             version = resolve_version(
                 question, self.policy["default_version"],
                 self.store.inherited_version(incoming.session_key), self.version_sets,
             )
+            started = time.perf_counter()
             await self.cards.stage(card, incoming.text, f"正在检索 AIOS {version} 本地五仓与知识库")
+            item.card_seconds += time.perf_counter() - started
             code_lookup = bool(CODE_LOOKUP_REQUEST.search(question))
+            question_type = "code" if code_lookup else "general"
             evidence = None
             upgrade = UPGRADE_PATH.search(question)
             if code_lookup:
@@ -546,7 +601,11 @@ class GatewayService:
                     f"AIOS {upgrade.group(2)} as the target analysis version."
                 )
             prompt = contextual_prompt(question, self.store.history(incoming.session_key), prompt)
+            local_search_ms = round((time.perf_counter() - local_started) * 1000)
+            started = time.perf_counter()
             await self.cards.stage(card, incoming.text, "正在生成结论")
+            item.card_seconds += time.perf_counter() - started
+            codex_started = time.perf_counter()
             model_task = asyncio.create_task(self.runner.run(self.policy, prompt, code_lookup))
             try:
                 answer = await asyncio.wait_for(
@@ -554,27 +613,47 @@ class GatewayService:
                 )
             except asyncio.TimeoutError:
                 self.store.set_message(incoming.msg_id, "background")
+                started = time.perf_counter()
                 await self.cards.stage(card, incoming.text, "问题较复杂，已转后台查询，完成后自动返回")
+                item.card_seconds += time.perf_counter() - started
                 answer = await model_task
             except asyncio.CancelledError:
                 model_task.cancel()
                 await asyncio.gather(model_task, return_exceptions=True)
                 raise
+            codex_exec_ms = round((time.perf_counter() - codex_started) * 1000)
             answer = format_answer(answer, version, self.policy["default_version"])
+            started = time.perf_counter()
             await self.cards.finish(card, incoming.text, answer)
+            item.card_seconds += time.perf_counter() - started
             self.store.add_turn(incoming.session_key, question, answer, version)
             self.store.set_message(incoming.msg_id, "finished")
+            result_status = "finished"
         except asyncio.CancelledError:
             with contextlib.suppress(Exception):
+                started = time.perf_counter()
                 await self.cards.needs_input(card, incoming.text, "当前分析已停止，可以继续提交新的问题。")
+                item.card_seconds += time.perf_counter() - started
             self.store.set_message(incoming.msg_id, "cancelled")
+            result_status = "cancelled"
             raise
         except Exception:
             with contextlib.suppress(Exception):
+                started = time.perf_counter()
                 await self.cards.needs_input(
                     card, incoming.text, "本次分析暂未完成，请稍后重试。问题内容无需重复整理。"
                 )
+                item.card_seconds += time.perf_counter() - started
             self.store.set_message(incoming.msg_id, "needs_retry")
+        finally:
+            self.store.record_metrics(
+                incoming.msg_id, question_type, version, result_status,
+                queue_wait_ms=max(0, queue_wait_ms),
+                local_search_ms=max(0, local_search_ms),
+                codex_exec_ms=max(0, codex_exec_ms),
+                card_ms=max(0, round(item.card_seconds * 1000)),
+                total_ms=max(0, round((time.perf_counter() - item.accepted_at) * 1000)),
+            )
 
     async def join(self) -> None:
         await self.incoming_queue.join()

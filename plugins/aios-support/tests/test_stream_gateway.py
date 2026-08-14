@@ -122,6 +122,25 @@ class StateStoreTest(unittest.TestCase):
             resolve_version("AIOS 5.5.22 升级 5.5.30 后指标变化", "5.5.30", None, versions),
         )
 
+    def test_request_metrics_are_upserted_without_question_content(self):
+        self.store.record_metrics(
+            "m-1", "code", "5.5.30", "finished",
+            queue_wait_ms=12, local_search_ms=34, codex_exec_ms=56,
+            card_ms=7, total_ms=109,
+        )
+        self.store.record_metrics(
+            "m-1", "code", "5.5.30", "finished",
+            queue_wait_ms=13, local_search_ms=35, codex_exec_ms=57,
+            card_ms=8, total_ms=113,
+        )
+        with self.store._database() as db:
+            columns = [row[1] for row in db.execute("PRAGMA table_info(request_metrics)")]
+            rows = db.execute("SELECT * FROM request_metrics WHERE request_id='m-1'").fetchall()
+        self.assertEqual(1, len(rows))
+        self.assertNotIn("question", columns)
+        self.assertNotIn("answer", columns)
+        self.assertEqual(113, rows[0][columns.index("total_ms")])
+
 
 class FakeCards:
     def __init__(self):
@@ -248,6 +267,51 @@ class SchedulerTest(unittest.IsolatedAsyncioTestCase):
         self.assertIn("检索 AIOS 5.5.30", stages)
         self.assertIn("生成结论", stages)
         self.assertIn("FINISHED", stages)
+
+    async def test_completed_question_persists_stage_timings(self):
+        store = StateStore(self.root / "metrics.db")
+        service = GatewayService(store, self.policy, self.versions, FakeCards(), FakeRunner(delay=0.02), 1, 2)
+        service.start()
+        service.submit(incoming())
+        await service.join()
+        await service.close()
+        with store._database() as db:
+            db.row_factory = __import__("sqlite3").Row
+            metric = db.execute("SELECT * FROM request_metrics WHERE request_id='m-1'").fetchone()
+        self.assertEqual("finished", metric["result_status"])
+        self.assertEqual("general", metric["question_type"])
+        self.assertEqual("5.5.30", metric["analysis_version"])
+        self.assertGreaterEqual(metric["queue_wait_ms"], 0)
+        self.assertGreaterEqual(metric["local_search_ms"], 0)
+        self.assertGreaterEqual(metric["codex_exec_ms"], 15)
+        self.assertGreaterEqual(metric["card_ms"], 0)
+        self.assertGreaterEqual(metric["total_ms"], metric["codex_exec_ms"])
+
+    async def test_card_metric_includes_every_card_operation(self):
+        class SlowCards(FakeCards):
+            async def create(self, item, preparation="已接收，等待处理"):
+                await asyncio.sleep(0.02)
+                return await super().create(item, preparation)
+
+            async def stage(self, handle, query, stage):
+                await asyncio.sleep(0.02)
+                await super().stage(handle, query, stage)
+
+            async def finish(self, handle, query, content):
+                await asyncio.sleep(0.02)
+                await super().finish(handle, query, content)
+
+        store = StateStore(self.root / "card-metrics.db")
+        service = GatewayService(store, self.policy, self.versions, SlowCards(), FakeRunner(), 1, 2)
+        service.start()
+        service.submit(incoming())
+        await service.join()
+        await service.close()
+        with store._database() as db:
+            card_ms = db.execute(
+                "SELECT card_ms FROM request_metrics WHERE request_id='m-1'"
+            ).fetchone()[0]
+        self.assertGreaterEqual(card_ms, 95)
 
     async def test_soft_timeout_keeps_work_running_and_finishes_later(self):
         cards = FakeCards()
