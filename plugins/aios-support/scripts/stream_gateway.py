@@ -174,6 +174,10 @@ class StateStore:
         history = self.history(session_key)
         return history[-1]["version"] if history else None
 
+    def clear_history(self, session_key: str) -> None:
+        with self._database() as db:
+            db.execute("DELETE FROM turns WHERE session_key=?", (session_key,))
+
 
 def resolve_version(question: str, default_version: str, inherited: Optional[str], version_sets: Path) -> str:
     explicit = re.search(r"(?i)\bAIOS\s*(?:版本\s*)?(\d+\.\d+\.\d+)\b", question)
@@ -319,19 +323,31 @@ class CardClient:
         )
         if not card_id:
             raise GatewayError("card_create_failed")
+        await replier.async_streaming(
+            card_id, "content", "⏳ 已接收，等待处理", append=False, finished=False, failed=False
+        )
         return replier, card_id
 
     async def stage(self, handle: tuple[Any, str], query: str, preparation: str) -> None:
         replier, card_id = handle
         await replier.async_put_card_data(card_id, self.data(query, preparation))
+        await replier.async_streaming(
+            card_id, "content", f"⏳ {preparation}", append=False, finished=False, failed=False
+        )
 
     async def finish(self, handle: tuple[Any, str], query: str, content: str) -> None:
         replier, card_id = handle
         await replier.async_finish(card_id, self.data(query, "已完成", content))
+        await replier.async_streaming(
+            card_id, "content", content, append=False, finished=True, failed=False
+        )
 
     async def fail(self, handle: tuple[Any, str], query: str, content: str = FAILED_MESSAGE) -> None:
         replier, card_id = handle
         await replier.async_fail(card_id, self.data(query, "处理失败", content))
+        await replier.async_streaming(
+            card_id, "content", content, append=False, finished=True, failed=True
+        )
 
 
 @dataclass
@@ -413,6 +429,17 @@ class GatewayService:
             if not cleaned.get("safe"):
                 raise GatewayError("unsafe_input")
             question = cleaned["sanitized"]
+            if question.strip().lower() == "/new":
+                version = self.policy["default_version"]
+                self.store.clear_history(incoming.session_key)
+                answer = format_answer(
+                    "已开始新的 AIOS 支持会话，请描述需要咨询或排查的问题。",
+                    version,
+                    self.policy["default_version"],
+                )
+                await self.cards.finish(card, incoming.text, answer)
+                self.store.set_message(incoming.msg_id, "finished")
+                return
             version = resolve_version(
                 question, self.policy["default_version"],
                 self.store.inherited_version(incoming.session_key), self.version_sets,

@@ -161,6 +161,11 @@ class FailingRunner(FakeRunner):
         raise GatewayError("test_failure")
 
 
+class UnexpectedRunner(FakeRunner):
+    async def run(self, policy, prompt, code_lookup):
+        raise AssertionError("model must not run for /new")
+
+
 class SchedulerTest(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -264,6 +269,24 @@ class SchedulerTest(unittest.IsolatedAsyncioTestCase):
         await service.join()
         await service.close()
         self.assertIn("FAILED", [event[1] for event in cards.events])
+
+    async def test_new_command_clears_history_without_running_model(self):
+        cards = FakeCards()
+        store = StateStore(self.root / "new.db")
+        store.add_turn("dm:u-1", "旧问题", "旧答案", "5.5.22")
+        service = GatewayService(store, self.policy, self.versions, cards, UnexpectedRunner(), 1, 2)
+        service.start()
+        item = incoming()
+        item = IncomingMessage(
+            item.msg_id, item.conversation_id, item.conversation_type, item.sender_staff_id,
+            item.sender_corp_id, item.robot_code, "/new", item.mentioned, item.sdk_message,
+        )
+        service.submit(item)
+        await service.join()
+        await service.close()
+        self.assertEqual([], store.history(item.session_key))
+        content = next(event[2] for event in cards.events if event[1] == "FINISHED")
+        self.assertIn("已开始新的 AIOS 支持会话", content)
 
 
 class ProcessGroupTest(unittest.IsolatedAsyncioTestCase):
@@ -409,6 +432,9 @@ class OfficialCardAdapterTest(unittest.IsolatedAsyncioTestCase):
             async def async_put_card_data(self, card_id, data):
                 calls.append(("stage", card_id, data))
 
+            async def async_streaming(self, card_id, key, value, append, finished, failed):
+                calls.append(("stream", card_id, key, value, append, finished, failed))
+
             async def async_finish(self, card_id, data):
                 calls.append(("finish", card_id, data))
 
@@ -422,9 +448,16 @@ class OfficialCardAdapterTest(unittest.IsolatedAsyncioTestCase):
             await cards.stage(handle, "问题", "检索")
             await cards.finish(handle, "问题", "结论")
             await cards.fail(handle, "问题")
-        self.assertEqual(["init", "start", "stage", "finish", "fail"], [call[0] for call in calls])
+        self.assertEqual(
+            ["init", "start", "stream", "stage", "stream", "finish", "stream", "fail", "stream"],
+            [call[0] for call in calls],
+        )
         self.assertFalse(calls[1][3])
-        self.assertEqual("结论", calls[3][2]["content"])
+        self.assertEqual("content", calls[2][2])
+        self.assertIn("已接收", calls[2][3])
+        self.assertEqual("结论", calls[5][2]["content"])
+        self.assertEqual("结论", calls[6][3])
+        self.assertTrue(calls[6][5])
 
     async def test_empty_card_id_fails_before_model_work(self):
         class EmptyReplier:
