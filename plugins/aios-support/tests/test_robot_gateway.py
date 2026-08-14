@@ -168,17 +168,20 @@ sys.exit(int(os.environ.get('FAKE_CODEX_EXIT', '0')))
         self.assertFalse(self.marker.exists())
         self.assertEqual("未配置 AIOS 5.5.29 的本地五仓快照，请先同步并冻结该版本。\n", result.stdout)
 
-    def test_source_lookup_uses_workspace_but_normal_question_does_not(self) -> None:
+    def test_codex_always_runs_from_configured_workspace(self) -> None:
         self.run_gateway("请查源码调用链", "源码结论")
-        source_arguments = self.args_file.read_text(encoding="utf-8")
+        source_arguments = self.args_file.read_text(encoding="utf-8").splitlines()
         self.assertIn("--ignore-rules", source_arguments)
-        self.assertNotIn(str(PLUGIN_ROOT), source_arguments)
-        self.assertIn("devops/run.sh", self.prompt_file.read_text(encoding="utf-8"))
+        self.assertEqual(str(PLUGIN_ROOT), source_arguments[source_arguments.index("-C") + 1])
+        source_prompt = self.prompt_file.read_text(encoding="utf-8")
+        self.assertIn("devops/run.sh", source_prompt)
+        self.assertIn("targeted read-only local search", source_prompt)
+        self.assertNotIn("Do not call tools or inspect the filesystem", source_prompt)
         self.assertEqual("evidence", self.mode_file.read_text(encoding="utf-8"))
 
         self.run_gateway("dGPU 为什么未初始化", "知识结论")
-        knowledge_arguments = self.args_file.read_text(encoding="utf-8")
-        self.assertNotIn(str(PLUGIN_ROOT), knowledge_arguments)
+        knowledge_arguments = self.args_file.read_text(encoding="utf-8").splitlines()
+        self.assertEqual(str(PLUGIN_ROOT), knowledge_arguments[knowledge_arguments.index("-C") + 1])
 
 
 if __name__ == "__main__":

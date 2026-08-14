@@ -137,7 +137,7 @@ def build_prompt(
     code_evidence: str | None = None,
 ) -> str:
     code_rule = (
-        f"Local source evidence has already been collected from the immutable {version} snapshot. Do not call tools or inspect the filesystem. Prioritize evidence_files, which contain ranked source context with line numbers; use matches only as secondary location hints."
+        f"Local source evidence has already been collected from the immutable {version} snapshot. Prioritize evidence_files, which contain ranked source context with line numbers; use matches only as secondary location hints. If that evidence is insufficient, perform a targeted read-only local search only in AIOS-related workspace paths or the local bare mirrors at the resolved {version} commits. Never scan unrelated repositories or substitute a moving branch for the resolved snapshot."
         if code_lookup
         else "Do not inspect the filesystem or source code. Answer directly from the injected local knowledge."
     )
@@ -173,7 +173,7 @@ def run_codex(policy: dict, codex_bin: Path, prompt: str, question: str) -> str:
     with tempfile.TemporaryDirectory(prefix="aios-gateway-") as directory:
         output = Path(directory) / "answer.txt"
         code_lookup = bool(CODE_LOOKUP_REQUEST.search(question))
-        workdir = Path(directory)
+        workdir = Path(policy["workspace"])
         command = [
             str(codex_bin),
             "exec",
