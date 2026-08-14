@@ -356,9 +356,8 @@ class CardClient:
 
     async def stage(self, handle: tuple[Any, str], query: str, preparation: str) -> None:
         replier, card_id = handle
-        await replier.async_put_card_data(card_id, self.data(query, preparation))
-        await replier.async_streaming(
-            card_id, "content", f"⏳ {preparation}", append=False, finished=False, failed=False
+        await replier.async_put_card_data(
+            card_id, self.data(query, preparation, "⏳ 已接收，正在分析")
         )
 
     async def finish(self, handle: tuple[Any, str], query: str, content: str) -> None:

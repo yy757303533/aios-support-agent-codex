@@ -545,16 +545,17 @@ class OfficialCardAdapterTest(unittest.IsolatedAsyncioTestCase):
             await cards.finish(handle, "问题", "结论")
             await cards.fail(handle, "问题")
         self.assertEqual(
-            ["init", "start", "stream", "stage", "stream", "finish", "stream", "fail", "stream"],
+            ["init", "start", "stream", "stage", "finish", "stream", "fail", "stream"],
             [call[0] for call in calls],
         )
         self.assertFalse(calls[1][3])
         self.assertIn("已排队", calls[1][2]["content"])
         self.assertEqual("content", calls[2][2])
         self.assertIn("已排队", calls[2][3])
-        self.assertEqual("结论", calls[5][2]["content"])
-        self.assertEqual("结论", calls[6][3])
-        self.assertTrue(calls[6][5])
+        self.assertIn("正在分析", calls[3][2]["content"])
+        self.assertEqual("结论", calls[4][2]["content"])
+        self.assertEqual("结论", calls[5][3])
+        self.assertTrue(calls[5][5])
 
     async def test_empty_card_id_fails_before_model_work(self):
         class EmptyReplier:
