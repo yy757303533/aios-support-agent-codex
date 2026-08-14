@@ -27,7 +27,7 @@ else
   "$venv/bin/pip" install --disable-pip-version-check -r "$repo_root/deploy/requirements-stream.txt"
 fi
 
-PYTHON_BIN="$venv/bin/python" bash "$repo_root/scripts/test-plugin.sh"
+PYTHON_BIN="$python_bin" bash "$repo_root/scripts/test-plugin.sh"
 
 mkdir -p /etc/aios-support /var/lib/aios-support-stream
 chmod 0700 /var/lib/aios-support-stream
