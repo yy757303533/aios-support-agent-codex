@@ -33,6 +33,8 @@ TAVILY_HIKARI_TOKEN
 
 正式机器人必须通过 `scripts/stream_gateway.py` 接入钉钉 Stream；`scripts/robot_gateway.py` 仅保留给 DWS 本地调试。网关从 root-only 策略文件读取固定的 `internal` 受众，输入先脱敏，并在 `/mnt/repos/zstack-workspace` 的只读 sandbox 中运行 Codex。120 秒内完成时直接结束卡片；超过 120 秒时卡片提示已转后台，任务继续运行并在同一卡片返回，最长运行 20 分钟。回答固定展示分析版本，不单独展示“信息来源”或“依据”附录。
 
+同一用户在同一会话中的问题按顺序处理，后续卡片立即显示排队位置；不同会话最多并行 3 条。`/status` 查询当前任务，`/cancel` 停止当前分析，`/new` 清空已完成的会话上下文。对外卡片只使用“排队中、正在分析、后台查询中、分析完成、需要补充信息”等状态，不展示内部失败或超时术语。服务启动时会把上次中断的运行状态标记为需要重新确认，避免任务永久停留在处理中。
+
 开发机使用 `scripts/install-stream-service.sh` 安装。安装器先验证插件、运行时、凭据权限和钉钉连接，Stream 服务成功连接后才停用旧 DWS 服务。
 
 workspace 的 `zdev` 必须由 `scripts/configure_runtime.py mcp` 改造成禁用的 `zdev_upstream` 与启用的 `zdev_readonly`。只读代理暴露 Jira/Confluence 查询和版本绑定的 `aios_search_local_code`，不暴露任何 GitLab 代码读取或搜索工具；源码始终查询开发机本地五仓 bare mirror。评论、修改 Issue、提交和 push 均不可见且伪造调用会被拒绝。`aios_refresh_code_mirrors` 是唯一批准的本地写操作，只能对 `config/repository-map.json` 中登记的 bare mirror 执行 `git fetch --prune origin`，不 checkout、不 commit、不 push，并且不得配置定时执行。

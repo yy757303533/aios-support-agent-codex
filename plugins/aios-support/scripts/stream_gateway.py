@@ -113,6 +113,9 @@ class StateStore:
                 CREATE INDEX IF NOT EXISTS turns_session_time ON turns(session_key, created_at DESC);
                 """
             )
+            db.execute(
+                "UPDATE messages SET status='needs_retry' WHERE status IN ('accepted','queued','running','background')"
+            )
 
     def _connect(self) -> sqlite3.Connection:
         db = sqlite3.connect(self.path, timeout=10)
@@ -180,6 +183,19 @@ class StateStore:
     def clear_history(self, session_key: str) -> None:
         with self._database() as db:
             db.execute("DELETE FROM turns WHERE session_key=?", (session_key,))
+
+    def pending_count(self, session_key: str) -> int:
+        with self._database() as db:
+            return db.execute(
+                "SELECT COUNT(*) FROM messages WHERE session_key=? AND status IN ('accepted','queued','running','background')",
+                (session_key,),
+            ).fetchone()[0]
+
+    def needs_retry_count(self, session_key: str) -> int:
+        with self._database() as db:
+            return db.execute(
+                "SELECT COUNT(*) FROM messages WHERE session_key=? AND status='needs_retry'", (session_key,)
+            ).fetchone()[0]
 
 
 def resolve_version(question: str, default_version: str, inherited: Optional[str], version_sets: Path) -> str:
@@ -320,19 +336,21 @@ class CardClient:
             "content": content,
         }
 
-    async def create(self, incoming: IncomingMessage) -> tuple[Any, str]:
+    async def create(
+        self, incoming: IncomingMessage, preparation: str = "已接收，等待处理"
+    ) -> tuple[Any, str]:
         from dingtalk_stream import AICardReplier
 
         replier = AICardReplier(self.client, incoming.sdk_message)
         card_id = await replier.async_start(
             self.template_id,
-            self.data(incoming.text, "已接收，等待处理", "⏳ 已接收，等待处理"),
+            self.data(incoming.text, preparation, f"⏳ {preparation}"),
             support_forward=False,
         )
         if not card_id:
             raise GatewayError("card_create_failed")
         await replier.async_streaming(
-            card_id, "content", "⏳ 已接收，等待处理", append=False, finished=False, failed=False
+            card_id, "content", f"⏳ {preparation}", append=False, finished=False, failed=False
         )
         return replier, card_id
 
@@ -357,11 +375,19 @@ class CardClient:
             card_id, "content", content, append=False, finished=True, failed=True
         )
 
+    async def needs_input(self, handle: tuple[Any, str], query: str, content: str) -> None:
+        replier, card_id = handle
+        await replier.async_finish(card_id, self.data(query, "需要补充信息", content))
+        await replier.async_streaming(
+            card_id, "content", content, append=False, finished=True, failed=False
+        )
+
 
 @dataclass
 class WorkItem:
     incoming: IncomingMessage
     card: Optional[tuple[Any, str]] = None
+    queue_position: int = 0
 
 
 class GatewayService:
@@ -378,7 +404,9 @@ class GatewayService:
         self.global_concurrency = global_concurrency
         self.busy_reply: Optional[Callable[[IncomingMessage], Awaitable[None]]] = None
         self.session_locks: dict[str, asyncio.Lock] = {}
+        self.current: dict[str, asyncio.Task] = {}
         self.tasks: list[asyncio.Task] = []
+        self.closing = False
 
     def start(self) -> None:
         self.tasks.append(asyncio.create_task(self._prepare_cards()))
@@ -386,10 +414,17 @@ class GatewayService:
         self.tasks.extend(asyncio.create_task(self._worker()) for _ in range(self.global_concurrency))
 
     def submit(self, incoming: IncomingMessage) -> str:
+        queue_position = self.store.pending_count(incoming.session_key)
         if not self.store.claim(incoming.msg_id, incoming.session_key):
             return "duplicate"
+        command = incoming.text.strip().lower()
+        if command in {"/status", "/cancel"}:
+            self.store.set_message(incoming.msg_id, "command")
+            handler = self._status if command == "/status" else self._cancel
+            self.tasks.append(asyncio.create_task(handler(incoming)))
+            return "command"
         try:
-            self.incoming_queue.put_nowait(WorkItem(incoming))
+            self.incoming_queue.put_nowait(WorkItem(incoming, queue_position=queue_position))
             return "accepted"
         except asyncio.QueueFull:
             self.store.set_message(incoming.msg_id, "busy")
@@ -410,7 +445,10 @@ class GatewayService:
         while True:
             item = await self.incoming_queue.get()
             try:
-                item.card = await self.cards.create(item.incoming)
+                preparation = "已接收，等待处理"
+                if item.queue_position:
+                    preparation = f"上一条问题还在处理中，本问题已排队（第 {item.queue_position} 位）"
+                item.card = await self.cards.create(item.incoming, preparation)
                 self.store.set_message(item.incoming.msg_id, "queued", item.card[1])
                 await self.ready_queue.put(item)
             except Exception:
@@ -424,14 +462,48 @@ class GatewayService:
             lock = self.session_locks.setdefault(item.incoming.session_key, asyncio.Lock())
             try:
                 async with lock:
-                    await self._process(item)
+                    process_task = asyncio.create_task(self._process(item))
+                    self.current[item.incoming.session_key] = process_task
+                    try:
+                        await process_task
+                    except asyncio.CancelledError:
+                        if self.closing:
+                            raise
+                    finally:
+                        if self.current.get(item.incoming.session_key) is process_task:
+                            self.current.pop(item.incoming.session_key, None)
             finally:
                 self.ready_queue.task_done()
+
+    async def _status(self, incoming: IncomingMessage) -> None:
+        card = await self.cards.create(incoming, "正在读取任务状态")
+        pending = self.store.pending_count(incoming.session_key)
+        interrupted = self.store.needs_retry_count(incoming.session_key)
+        if pending:
+            content = f"正在处理 {pending} 条问题，请等待当前任务完成。"
+        elif interrupted:
+            content = "上次任务因服务重启未完成，请重新发送原问题。"
+        else:
+            content = "当前没有正在处理或排队的问题。"
+        await self.cards.finish(card, incoming.text, content)
+        self.store.set_message(incoming.msg_id, "finished")
+
+    async def _cancel(self, incoming: IncomingMessage) -> None:
+        task = self.current.get(incoming.session_key)
+        stopped = bool(task and not task.done())
+        if stopped:
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+        card = await self.cards.create(incoming, "正在停止当前分析")
+        content = "已停止当前分析，可以继续提交新的问题。" if stopped else "当前没有正在处理的问题。"
+        await self.cards.finish(card, incoming.text, content)
+        self.store.set_message(incoming.msg_id, "finished")
 
     async def _process(self, item: WorkItem) -> None:
         incoming, card = item.incoming, item.card
         assert card is not None
         try:
+            self.store.set_message(incoming.msg_id, "running")
             await self.cards.stage(card, incoming.text, "正在解析版本与问题")
             cleaned = sanitize(incoming.text)
             if not cleaned.get("safe"):
@@ -502,19 +574,22 @@ class GatewayService:
             self.store.set_message(incoming.msg_id, "finished")
         except asyncio.CancelledError:
             with contextlib.suppress(Exception):
-                await self.cards.fail(card, incoming.text)
+                await self.cards.needs_input(card, incoming.text, "当前分析已停止，可以继续提交新的问题。")
             self.store.set_message(incoming.msg_id, "cancelled")
             raise
         except Exception:
             with contextlib.suppress(Exception):
-                await self.cards.fail(card, incoming.text)
-            self.store.set_message(incoming.msg_id, "failed")
+                await self.cards.needs_input(
+                    card, incoming.text, "本次分析暂未完成，请稍后重试。问题内容无需重复整理。"
+                )
+            self.store.set_message(incoming.msg_id, "needs_retry")
 
     async def join(self) -> None:
         await self.incoming_queue.join()
         await self.ready_queue.join()
 
     async def close(self) -> None:
+        self.closing = True
         for task in self.tasks:
             task.cancel()
         await asyncio.gather(*self.tasks, return_exceptions=True)

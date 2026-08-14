@@ -128,9 +128,9 @@ class FakeCards:
         self.events = []
         self.counter = 0
 
-    async def create(self, item):
+    async def create(self, item, preparation="已接收，等待处理"):
         self.counter += 1
-        self.events.append((item.msg_id, "create"))
+        self.events.append((item.msg_id, "create", preparation))
         return self, f"card-{self.counter}"
 
     async def stage(self, handle, query, stage):
@@ -139,8 +139,8 @@ class FakeCards:
     async def finish(self, handle, query, content):
         self.events.append((handle[1], "FINISHED", content))
 
-    async def fail(self, handle, query, content="failed"):
-        self.events.append((handle[1], "FAILED"))
+    async def needs_input(self, handle, query, content):
+        self.events.append((handle[1], "NEEDS_INPUT", content))
 
 
 class FakeRunner:
@@ -233,6 +233,8 @@ class SchedulerTest(unittest.IsolatedAsyncioTestCase):
         await service.join()
         await service.close()
         self.assertEqual(2, tracker["peak"])
+        queued = [event[2] for event in service.cards.events if event[1] == "create"]
+        self.assertTrue(any("已排队" in text for text in queued))
 
     async def test_card_shows_all_stages_and_finishes(self):
         cards = FakeCards()
@@ -281,14 +283,63 @@ class SchedulerTest(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("信息来源", content)
         self.assertNotIn("依据", content)
 
-    async def test_runner_failure_marks_card_failed(self):
+    async def test_runner_failure_asks_for_retry_without_showing_failure(self):
         cards = FakeCards()
         service = GatewayService(StateStore(self.root / "f.db"), self.policy, self.versions, cards, FailingRunner(), 1, 2)
         service.start()
         service.submit(incoming())
         await service.join()
         await service.close()
-        self.assertIn("FAILED", [event[1] for event in cards.events])
+        self.assertIn("NEEDS_INPUT", [event[1] for event in cards.events])
+        content = next(event[2] for event in cards.events if event[1] == "NEEDS_INPUT")
+        self.assertNotIn("失败", content)
+
+    async def test_status_command_reports_current_work_without_running_model(self):
+        gate = asyncio.Event()
+        cards = FakeCards()
+        service = GatewayService(StateStore(self.root / "status.db"), self.policy, self.versions, cards, FakeRunner(gate=gate), 1, 3)
+        service.start()
+        service.submit(incoming("work"))
+        await asyncio.sleep(0.03)
+        command = incoming("status")
+        command = IncomingMessage(
+            command.msg_id, command.conversation_id, command.conversation_type, command.sender_staff_id,
+            command.sender_corp_id, command.robot_code, "/status", command.mentioned, command.sdk_message,
+        )
+        self.assertEqual("command", service.submit(command))
+        await asyncio.sleep(0.03)
+        gate.set()
+        await service.join()
+        await service.close()
+        content = " ".join(str(event[2]) for event in cards.events if len(event) > 2)
+        self.assertIn("正在处理", content)
+
+    async def test_cancel_command_stops_current_work_with_friendly_message(self):
+        gate = asyncio.Event()
+        cards = FakeCards()
+        service = GatewayService(StateStore(self.root / "cancel.db"), self.policy, self.versions, cards, FakeRunner(gate=gate), 1, 3)
+        service.start()
+        service.submit(incoming("work"))
+        await asyncio.sleep(0.03)
+        command = incoming("cancel")
+        command = IncomingMessage(
+            command.msg_id, command.conversation_id, command.conversation_type, command.sender_staff_id,
+            command.sender_corp_id, command.robot_code, "/cancel", command.mentioned, command.sdk_message,
+        )
+        self.assertEqual("command", service.submit(command))
+        await asyncio.sleep(0.05)
+        await service.close()
+        content = " ".join(str(event[2]) for event in cards.events if len(event) > 2)
+        self.assertIn("已停止", content)
+        self.assertNotIn("失败", content)
+
+    async def test_store_marks_interrupted_work_as_needing_retry(self):
+        path = self.root / "recover.db"
+        store = StateStore(path)
+        store.claim("old", "dm:u-1")
+        store.set_message("old", "background")
+        recovered = StateStore(path)
+        self.assertEqual(1, recovered.needs_retry_count("dm:u-1"))
 
     async def test_new_command_clears_history_without_running_model(self):
         cards = FakeCards()
@@ -489,7 +540,7 @@ class OfficialCardAdapterTest(unittest.IsolatedAsyncioTestCase):
         fake_module = SimpleNamespace(AICardReplier=FakeReplier)
         with mock.patch.dict(sys.modules, {"dingtalk_stream": fake_module}):
             cards = CardClient("client")
-            handle = await cards.create(incoming())
+            handle = await cards.create(incoming(), "上一条问题处理中，本问题已排队（第 1 位）")
             await cards.stage(handle, "问题", "检索")
             await cards.finish(handle, "问题", "结论")
             await cards.fail(handle, "问题")
@@ -498,9 +549,9 @@ class OfficialCardAdapterTest(unittest.IsolatedAsyncioTestCase):
             [call[0] for call in calls],
         )
         self.assertFalse(calls[1][3])
-        self.assertIn("已接收", calls[1][2]["content"])
+        self.assertIn("已排队", calls[1][2]["content"])
         self.assertEqual("content", calls[2][2])
-        self.assertIn("已接收", calls[2][3])
+        self.assertIn("已排队", calls[2][3])
         self.assertEqual("结论", calls[5][2]["content"])
         self.assertEqual("结论", calls[6][3])
         self.assertTrue(calls[6][5])
